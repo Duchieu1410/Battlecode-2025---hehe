@@ -228,11 +228,12 @@ def run_splasher():
             if check_dist < cur_dist:
                 cur_dist = check_dist
                 cur_ruin = tile
-    target_loc = cur_ruin.get_map_location()
-    if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
-            set_timeline_marker("Tower built", 0, 255, 0)
-            log("Built a tower at " + str(target_loc) + "!")
+    if cur_ruin != None:
+        target_loc = cur_ruin.get_map_location()
+        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
+                complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+                set_timeline_marker("Tower built", 0, 255, 0)
+                log("Built a tower at " + str(target_loc) + "!")
     dir = directions[random.randint(0, len(directions) - 1)]
     next_loc = get_location().add(dir)
     if can_move(dir):

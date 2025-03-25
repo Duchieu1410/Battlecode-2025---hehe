@@ -105,7 +105,7 @@ def run_tower():
 
         # If we are not currently saving and we receive the save chips message, start saving
         if not should_save and m.get_bytes() == int(MessageType.SAVE_CHIPS):
-            save_turns = 75
+            save_turns = 60
             should_save = True
 
     # TODO: can we attack other bots?   

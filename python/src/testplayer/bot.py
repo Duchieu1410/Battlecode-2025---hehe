@@ -112,7 +112,7 @@ def run_tower():
     nearbyRobots = sense_nearby_robots()
     for robot in nearbyRobots:
         if (can_attack(robot.get_location())):
-            attack(robot.getlocation())
+            attack(robot.get_location())
 
 def run_soldier():
     # Sense information about all visible nearby tiles.
@@ -178,7 +178,8 @@ def run_mopper():
                 cur_tower = tower
         dir = get_location().direction_to(cur_tower)
         set_indicator_string(f"Returning to {known_towers[0]}")
-        bug2(cur_tower)
+        if cur_tower != None:
+            bug2(cur_tower)
 
     nearby_tiles = sense_nearby_map_infos()
     cur_ruin = None

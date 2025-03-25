@@ -61,7 +61,7 @@ def turn():
     elif get_type() == UnitType.MOPPER:
         run_mopper()
     elif get_type() == UnitType.SPLASHER:
-        pass  # TODO
+        run_splasher()
     elif get_type().is_tower_type():
         run_tower()
     else:
@@ -81,14 +81,15 @@ def run_tower():
         next_loc = get_location().add(dir)
 
         # Pick a random robot type to build.
-        robot_type = random.randint(0, 2)
-        if robot_type == 0 and can_build_robot(UnitType.SOLDIER, next_loc):
+        robot_type = random.randint(0, 100)
+        if robot_type <= 60 and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type == 1 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type > 60 and robot_type <= 80 and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type == 2 and can_build_robot(UnitType.SPLASHER, next_loc):
+        if robot_type <= 100 and robot_type > 80 and can_build_robot(UnitType.SPLASHER, next_loc):
+            build_robot(UnitType.SPLASHER, next_loc)
             set_indicator_string("SPLASHER NOT IMPLEMENTED YET")
             #build_robot(RobotType.SPLASHER, next_loc)
             #log("BUILT A SPLASHER")
@@ -107,8 +108,11 @@ def run_tower():
             save_turns = 75
             should_save = True
 
-    # TODO: can we attack other bots?
-
+    # TODO: can we attack other bots?   
+    nearbyRobots = sense_nearby_robots()
+    for robot in nearbyRobots:
+        if (can_attack(robot.get_location())):
+            attack(robot.getlocation())
 
 def run_soldier():
     # Sense information about all visible nearby tiles.
@@ -191,6 +195,13 @@ def run_mopper():
         update_friendly_towers()
         check_nearby_ruins()
 
+def run_splasher():
+    dir = directions[random.randint(0, len(directions) - 1)]
+    next_loc = get_location().add(dir)
+    if can_move(dir):
+        move(dir)
+    if can_attack(next_loc):
+        attack(next_loc)
 
 def update_friendly_towers():
     global should_save

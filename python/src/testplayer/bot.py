@@ -145,13 +145,15 @@ def run_tower():
 
         # Pick a random robot type to build.
         robot_type = random.randint(1, 100)
-        if robot_type <= 100 and can_build_robot(UnitType.SOLDIER, next_loc):
+        # Pick a random robot type to build.
+        robot_type = random.randint(1, 100)
+        if robot_type <= 50 and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type > 100 and robot_type <= 100 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type > 50 and robot_type <= 55 and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > 100 and can_build_robot(UnitType.SPLASHER, next_loc):
+        if robot_type <= 100 and robot_type > 55 and can_build_robot(UnitType.SPLASHER, next_loc):
             build_robot(UnitType.SPLASHER, next_loc)
             log("BUILT A SPLASHER")
     else:

@@ -58,6 +58,7 @@ def turn():
     """
     global turn_count
     global is_messenger
+    global target_of_soldier
 
     turn_count += 1
 

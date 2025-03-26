@@ -52,6 +52,7 @@ paint_capacity = 0
 
 # Soldier Variables
 is_searchsoldier = True
+is_attackingsoldier = False
 searchsoldier_type = [False] * 8
 target_of_soldier = MapLocation(100000, 100000)
 targets = [MapLocation(height-1,0), MapLocation(0,0), MapLocation(0, width-1), MapLocation(height-1, width-1)]
@@ -73,13 +74,15 @@ def turn():
     global is_messenger
     global target_of_soldier
     global target_of_mopper
+    global target_of_splasher
     global targets
     global is_refilling
     global paint_capacity
+    global is_attackingsoldier
     turn_count += 1
 
-    block_width = math.sqrt(width)
-    block_height = math.sqrt(height)
+    block_width = int(math.sqrt(width)) 
+    block_height = int(math.sqrt(height))
     i = 0
     while i < width:
         targets.append(MapLocation(0,i))
@@ -90,8 +93,22 @@ def turn():
         targets.append(MapLocation(i,0))
         targets.append(MapLocation(i,width-1))
         i += block_height
-    if get_type() == UnitType.MOPPER and get_id() % 3 == 0:
-        is_messenger = True
+    # if get_type() == UnitType.MOPPER and get_id() % 3 == 0:
+    #     is_messenger = True
+
+    # Sets a part of soldiers as attackers
+    if get_type() == UnitType.SOLDIER:
+        if turn_count <= 300: 
+            if get_id() % 4 == 0:
+                is_attackingsoldier = True
+            else:
+                is_attackingsoldier = False
+        else:
+            if get_id() % 4 == 0:
+                is_attackingsoldier = True
+            else:   
+                is_attackingsoldier = True
+    
     if get_type() == UnitType.SOLDIER:
         paint_capacity = 200
         if target_of_soldier == MapLocation(100000, 100000):
@@ -114,6 +131,7 @@ def turn():
 
 
 def run_tower():
+    # Global variables
     global save_turns
     global should_save
 
@@ -127,13 +145,13 @@ def run_tower():
 
         # Pick a random robot type to build.
         robot_type = random.randint(1, 100)
-        if robot_type <= 40 and can_build_robot(UnitType.SOLDIER, next_loc):
+        if robot_type <= 100 and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type > 40 and robot_type <= 42 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type > 100 and robot_type <= 100 and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > 42 and can_build_robot(UnitType.SPLASHER, next_loc):
+        if robot_type <= 100 and robot_type > 100 and can_build_robot(UnitType.SPLASHER, next_loc):
             build_robot(UnitType.SPLASHER, next_loc)
             log("BUILT A SPLASHER")
     else:
@@ -157,11 +175,16 @@ def run_tower():
             attack(robot.get_location())
 
 def refill_paint():
+    # Global variables
     global is_refilling
     global paint_capacity
+
+    # Resets refilling to 0
     if not len(known_towers) > 0:
         is_refilling = False
         return
+    
+    # Finds the nearest tower
     cur_tower = None
     cur_dist = 9999999
     for tower in known_towers:
@@ -169,6 +192,7 @@ def refill_paint():
         if check_dist < cur_dist:
             cur_dist = check_dist
             cur_tower = tower
+
     if cur_tower is not None:
         # Find robot at the tower's location
         dir = get_location().direction_to(cur_tower)
@@ -176,38 +200,67 @@ def refill_paint():
         next_dir = bug2(cur_tower)
         if next_dir is not None:
             move(next_dir)
-        amount_needed = paint_capacity - get_paint()
-        if can_transfer_paint(cur_tower, -amount_needed):
-            log("Refilled Paint for Robot")
-            transfer_paint(cur_tower, -amount_needed)
-            is_refilling = False
+        if can_sense_robot_at_location(cur_tower):
+            tower_robot = sense_robot_at_location(cur_tower)
+            amount_needed = -get_paint()
+            if paint_capacity <= tower_robot.get_paint_amount():
+                amount_needed += paint_capacity
+            else:
+                amount_needed += tower_robot.get_paint_amount()
+            
+            if amount_needed > 0 and can_transfer_paint(cur_tower, -amount_needed):
+                log("Refilled Paint for Robot")
+                transfer_paint(cur_tower, -amount_needed)
+                is_refilling = False
     else:
         is_refilling = False
         
 
 def run_soldier():
+    if is_attackingsoldier:
+        set_indicator_dot(get_location(), 255,0,0)
+    # Global variables
     global is_refilling
+    global target_of_soldier
+    global targets
+
     update_friendly_towers()
+
+    #Checks if refilling is needed
     if get_paint() <= 20:
         is_refilling = True
     if is_refilling == True: 
         refill_paint()
         return
-    global target_of_soldier
-    global targets
+    
     # Sense information about all visible nearby tiles.
     nearby_tiles = sense_nearby_map_infos()
 
     # Search for the closest nearby ruin to complete.
     cur_ruin = None
     cur_dist = 9999999
+    # Search if there are any enemy towers
+    cur_enemy_tower = None
     for tile in nearby_tiles:
         if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) == None:
             check_dist = tile.get_map_location().distance_squared_to(get_location())
             if check_dist < cur_dist:
                 cur_dist = check_dist
                 cur_ruin = tile
+        if is_attackingsoldier:
+            tile_robot = sense_robot_at_location(tile.get_map_location())
+            if tile_robot is not None and tile_robot.get_type().is_tower_type() and not tile_robot.get_team() == get_team():
+                cur_enemy_tower = tile.get_map_location()
 
+    # Attacks enemy tower 
+    if cur_enemy_tower is not None and is_attackingsoldier:
+        dir = get_location().direction_to(cur_enemy_tower)
+        if can_move(dir):
+            move(dir)
+        if can_attack(cur_enemy_tower):
+            log("Gotta kill em all")
+            attack(cur_enemy_tower)
+    
     if cur_ruin is not None:
         target_loc = cur_ruin.get_map_location()
         dir = get_location().direction_to(target_loc)
@@ -232,8 +285,10 @@ def run_soldier():
             complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
             set_timeline_marker("Tower built", 0, 255, 0)
             log("Built a tower at " + str(target_loc) + "!")
+
     update_friendly_towers()
-    # Move and attack randomly if no objective.
+
+    # Movement
     if is_searchsoldier == False:
         dir = directions[random.randint(0, len(directions) - 1)]
         next_loc = get_location().add(dir)
@@ -255,9 +310,12 @@ def run_soldier():
 
 
 def run_mopper():
-    update_friendly_towers()
+    # Global Variables
     global target_of_mopper
     global targets
+
+    update_friendly_towers()
+    
     if should_save and len(known_towers) > 0:
         # Move to first known tower if we are saving
         cur_tower = None
@@ -273,6 +331,7 @@ def run_mopper():
             next_dir = bug2(cur_tower)
             move(next_dir)
 
+    # Finds ruins nearby and checks if it is buildable
     nearby_tiles = sense_nearby_map_infos()
     cur_ruin = None
     cur_dist = 9999999
@@ -292,8 +351,10 @@ def run_mopper():
                 complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
                 set_timeline_marker("Tower built", 0, 255, 0)
                 log("Built a tower at " + str(target_loc) + "!")
+
     update_friendly_towers()
-    # Move and attack randomly.
+
+    # Move and attack.
     if is_searchmopper == False:
         dir = directions[random.randint(0, len(directions) - 1)]
         next_loc = get_location().add(dir)
@@ -318,7 +379,6 @@ def run_mopper():
                 attack(next_loc)
             move(search_dir)
 
-    # We can also move our code into different methods or classes to better organize it!
     update_enemy_robots()
 
     if is_messenger:
@@ -329,13 +389,20 @@ def run_mopper():
         check_nearby_ruins()
 
 def run_splasher():
+    # Global variables
     global is_refilling
+    global target_of_splasher
+
     update_friendly_towers()
+
+    # Checks if needs refill
     if get_paint() <= 20:
         is_refilling = True
     if is_refilling == True: 
         refill_paint()
         return
+    
+    # Finds nearby ruins and checks if it is buildable
     nearby_tiles = sense_nearby_map_infos()
     cur_ruin = None
     cur_dist = 9999999
@@ -351,7 +418,9 @@ def run_splasher():
                 complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
                 set_timeline_marker("Tower built", 0, 255, 0)
                 log("Built a tower at " + str(target_loc) + "!")
+
     update_friendly_towers()
+
     if is_searchsplasher == False:
         dir = directions[random.randint(0, len(directions) - 1)]
         next_loc = get_location().add(dir)
@@ -364,8 +433,8 @@ def run_splasher():
             log("Reached target, now changing to new target")
             target_of_splasher = targets[random.randint(0, len(targets)-1)]
         search_dir = bug2(target_of_splasher)
-        next_loc = get_location().add(search_dir)
         if search_dir is not None:
+            next_loc = get_location().add(search_dir)
             move(search_dir)
             if can_attack(next_loc):
                 attack(next_loc)

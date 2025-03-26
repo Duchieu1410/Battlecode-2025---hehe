@@ -1,4 +1,5 @@
 import random
+import math
 from enum import IntEnum
 
 from battlecode25.stubs import *
@@ -71,12 +72,24 @@ def turn():
     global turn_count
     global is_messenger
     global target_of_soldier
+    global target_of_mopper
     global targets
     global is_refilling
     global paint_capacity
     turn_count += 1
 
-    # Assign messenger to about half of our moppers
+    block_width = math.sqrt(width)
+    block_height = math.sqrt(height)
+    i = 0
+    while i < width:
+        targets.append(MapLocation(0,i))
+        targets.append(MapLocation(height-1,i))
+        i += block_width
+    i = 0
+    while i < height:
+        targets.append(MapLocation(i,0))
+        targets.append(MapLocation(i,width-1))
+        i += block_height
     if get_type() == UnitType.MOPPER and get_id() % 3 == 0:
         is_messenger = True
     if get_type() == UnitType.SOLDIER:
@@ -85,9 +98,13 @@ def turn():
             target_of_soldier = targets[random.randint(0, len(targets)-1)]
         run_soldier()
     elif get_type() == UnitType.MOPPER:
+        if target_of_mopper == MapLocation(100000, 100000):
+            target_of_mopper = targets[random.randint(0, len(targets)-1)]
         paint_capacity = 100
         run_mopper()
     elif get_type() == UnitType.SPLASHER:
+        if target_of_splasher == MapLocation(100000, 100000):
+            target_of_splasher = targets[random.randint(0, len(targets)-1)]
         paint_capacity = 300
         run_splasher()
     elif get_type().is_tower_type():
@@ -110,13 +127,13 @@ def run_tower():
 
         # Pick a random robot type to build.
         robot_type = random.randint(1, 100)
-        if robot_type <= 50 and can_build_robot(UnitType.SOLDIER, next_loc):
+        if robot_type <= 40 and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type > 50 and robot_type <= 55 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type > 40 and robot_type <= 42 and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > 55 and can_build_robot(UnitType.SPLASHER, next_loc):
+        if robot_type <= 100 and robot_type > 42 and can_build_robot(UnitType.SPLASHER, next_loc):
             build_robot(UnitType.SPLASHER, next_loc)
             log("BUILT A SPLASHER")
     else:
@@ -148,18 +165,21 @@ def refill_paint():
     cur_tower = None
     cur_dist = 9999999
     for tower in known_towers:
-        check_dist = tower.get_map_location().distance_squared_to(get_location())
+        check_dist = tower.distance_squared_to(get_location())
         if check_dist < cur_dist:
             cur_dist = check_dist
             cur_tower = tower
     if cur_tower is not None:
+        # Find robot at the tower's location
         dir = get_location().direction_to(cur_tower)
         set_indicator_string(f"Returning to {cur_tower}")
         next_dir = bug2(cur_tower)
         if next_dir is not None:
             move(next_dir)
-        if can_transfer_paint(cur_tower, -(paint_capacity - get_paint())):
-            transfer_paint(cur_tower, -(paint_capacity - get_paint()))
+        amount_needed = paint_capacity - get_paint()
+        if can_transfer_paint(cur_tower, -amount_needed):
+            log("Refilled Paint for Robot")
+            transfer_paint(cur_tower, -amount_needed)
             is_refilling = False
     else:
         is_refilling = False
@@ -264,8 +284,8 @@ def run_mopper():
                 cur_ruin = tile
     if cur_ruin != None:
         target_loc = cur_ruin.get_map_location()
-        for tile in sense_nearby_map_infos(cur_ruin, 8):
-            if tile.get_paint().is_enemy() == True:
+        for tile in sense_nearby_map_infos(target_loc, 8):
+            if tile.get_paint().is_enemy():
                 if can_attack(tile.get_map_location()):
                     attack(tile.get_map_location())
         if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
@@ -288,14 +308,14 @@ def run_mopper():
         if get_location() == target_of_mopper:
             log("Reached target, now changing to new target")
             target_of_mopper = targets[random.randint(0, len(targets)-1)]
-        search_dir = bug2(target_of_soldier)
-        next_loc = get_location().add(search_dir)
-        if can_mop_swing(search_dir):
-            mop_swing(search_dir)
-            log("Mop Swing! Booyah!")
-        elif can_attack(next_loc):
-            attack(next_loc)
+        search_dir = bug2(target_of_mopper)
         if search_dir is not None:
+            next_loc = get_location().add(search_dir)
+            if can_mop_swing(search_dir):
+                mop_swing(search_dir)
+                log("Mop Swing! Booyah!")
+            elif can_attack(next_loc):
+                attack(next_loc)
             move(search_dir)
 
     # We can also move our code into different methods or classes to better organize it!
@@ -332,12 +352,24 @@ def run_splasher():
                 set_timeline_marker("Tower built", 0, 255, 0)
                 log("Built a tower at " + str(target_loc) + "!")
     update_friendly_towers()
-    dir = directions[random.randint(0, len(directions) - 1)]
-    next_loc = get_location().add(dir)
-    if can_move(dir):
-        move(dir)
-    if can_attack(next_loc):
-        attack(next_loc)
+    if is_searchsplasher == False:
+        dir = directions[random.randint(0, len(directions) - 1)]
+        next_loc = get_location().add(dir)
+        if can_move(dir):
+            move(dir)
+        if can_attack(next_loc):
+            attack(next_loc)
+    elif target_of_splasher is not None:
+        if get_location() == target_of_splasher:
+            log("Reached target, now changing to new target")
+            target_of_splasher = targets[random.randint(0, len(targets)-1)]
+        search_dir = bug2(target_of_splasher)
+        next_loc = get_location().add(search_dir)
+        if search_dir is not None:
+            move(search_dir)
+            if can_attack(next_loc):
+                attack(next_loc)
+
 
 def update_friendly_towers():
     global should_save
@@ -486,7 +518,14 @@ def bug2(target):
         line = create_line(get_location(), target)
 
     if not is_tracing:
-        dir_to_target = Direction(get_direction_to(get_location(), target))
+        delta = get_direction_to(get_location(), target)
+        dir_to_target = None
+        for d in directions:
+            if d.value == delta:
+                dir_to_target = d
+                break
+        if dir_to_target is None:
+            dir_to_target = Direction.CENTER  # Fallback, though unlikely
 
         if can_move(dir_to_target):
             return dir_to_target
@@ -503,11 +542,11 @@ def bug2(target):
         for _ in range(9):
             if can_move(tracing_dir):
                 old_tracing_dir = tracing_dir
-                tracing_dir = tracing_dir.rotate_right()
-                tracing_dir = tracing_dir.rotate_right()
+                tracing_dir = tracing_dir.rotate_right().rotate_right()
                 return old_tracing_dir
             else:
                 tracing_dir = tracing_dir.rotate_left()
+        return None  # Explicit, though should be handled by loop
 
 
 def create_line(a, b):

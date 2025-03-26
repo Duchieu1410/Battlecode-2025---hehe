@@ -163,7 +163,6 @@ def refill_paint():
             is_refilling = False
     else:
         is_refilling = False
-
         
 
 def run_soldier():
@@ -236,13 +235,7 @@ def run_soldier():
 
 
 def run_mopper():
-    global is_refilling
     update_friendly_towers()
-    if get_paint() <= 20:
-        is_refilling = True
-    if is_refilling == True: 
-        refill_paint()
-        return
     global target_of_mopper
     global targets
     if should_save and len(known_towers) > 0:

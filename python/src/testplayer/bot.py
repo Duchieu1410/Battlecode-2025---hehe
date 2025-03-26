@@ -42,6 +42,15 @@ line = set()
 obstacle_start_dist = 0
 tracing_dir = None
 
+height = get_map_height()
+width = get_map_width()
+
+# Soldier Variables
+is_searchsoldier = True
+searchsoldier_type = [False] * 8
+target_of_soldier = MapLocation(100000, 100000)
+targets = [MapLocation(height-1,0), MapLocation(0,0), MapLocation(0, width-1), MapLocation(height-1, width-1)]
+
 def turn():
     """
     MUST be defined for robot to run
@@ -55,8 +64,9 @@ def turn():
     # Assign messenger to about half of our moppers
     if get_type() == UnitType.MOPPER and get_id() % 3 == 0:
         is_messenger = True
-
     if get_type() == UnitType.SOLDIER:
+        if target_of_soldier == MapLocation(100000, 100000):
+            target_of_soldier = targets[random.randint(0, len(targets)-1)]
         run_soldier()
     elif get_type() == UnitType.MOPPER:
         run_mopper()
@@ -82,17 +92,15 @@ def run_tower():
 
         # Pick a random robot type to build.
         robot_type = random.randint(1, 100)
-        if robot_type <= 40 and can_build_robot(UnitType.SOLDIER, next_loc):
+        if robot_type <= 60 and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type > 40 and robot_type <= 80 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type > 60 and robot_type <= 70 and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > 80 and can_build_robot(UnitType.SPLASHER, next_loc):
+        if robot_type <= 100 and robot_type > 70 and can_build_robot(UnitType.SPLASHER, next_loc):
             build_robot(UnitType.SPLASHER, next_loc)
-            set_indicator_string("SPLASHER NOT IMPLEMENTED YET")
-            #build_robot(RobotType.SPLASHER, next_loc)
-            #log("BUILT A SPLASHER")
+            log("BUILT A SPLASHER")
     else:
         # Otherwise, tick down the number of remaining save turns
         set_indicator_string(f"Saving for {save_turns} more turns")
@@ -105,7 +113,7 @@ def run_tower():
 
         # If we are not currently saving and we receive the save chips message, start saving
         if not should_save and m.get_bytes() == int(MessageType.SAVE_CHIPS):
-            save_turns = 60
+            save_turns = 50
             should_save = True
 
     # TODO: can we attack other bots?   
@@ -154,10 +162,13 @@ def run_soldier():
             log("Built a tower at " + str(target_loc) + "!")
 
     # Move and attack randomly if no objective.
-    dir = directions[random.randint(0, len(directions) - 1)]
-    next_loc = get_location().add(dir)
-    if can_move(dir):
-        move(dir)
+    if is_searchsoldier == False:
+        dir = directions[random.randint(0, len(directions) - 1)]
+        next_loc = get_location().add(dir)
+        if can_move(dir):
+            move(dir)
+    else:
+        bug2(target_of_soldier)
 
     # Try to paint beneath us as we walk to avoid paint penalties.
     # Avoiding wasting paint by re-painting our own tiles.

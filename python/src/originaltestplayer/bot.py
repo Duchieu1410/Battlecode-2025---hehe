@@ -42,15 +42,6 @@ line = set()
 obstacle_start_dist = 0
 tracing_dir = None
 
-height = get_map_height()
-width = get_map_width()
-
-# Soldier Variables
-is_searchsoldier = True
-searchsoldier_type = [False] * 8
-target_of_soldier = MapLocation(100000, 100000)
-targets = [MapLocation(height-1,0), MapLocation(0,0), MapLocation(0, width-1), MapLocation(height-1, width-1)]
-
 def turn():
     """
     MUST be defined for robot to run
@@ -58,21 +49,19 @@ def turn():
     """
     global turn_count
     global is_messenger
-    global target_of_soldier
-    global targets
+
     turn_count += 1
 
     # Assign messenger to about half of our moppers
-    if get_type() == UnitType.MOPPER and get_id() % 3 == 0:
+    if get_type() == UnitType.MOPPER and get_id() % 2 == 0:
         is_messenger = True
+
     if get_type() == UnitType.SOLDIER:
-        if target_of_soldier == MapLocation(100000, 100000):
-            target_of_soldier = targets[random.randint(0, len(targets)-1)]
         run_soldier()
     elif get_type() == UnitType.MOPPER:
         run_mopper()
     elif get_type() == UnitType.SPLASHER:
-        run_splasher()
+        pass  # TODO
     elif get_type().is_tower_type():
         run_tower()
     else:
@@ -92,16 +81,17 @@ def run_tower():
         next_loc = get_location().add(dir)
 
         # Pick a random robot type to build.
-        robot_type = random.randint(1, 100)
-        if robot_type <= 60 and can_build_robot(UnitType.SOLDIER, next_loc):
+        robot_type = random.randint(0, 2)
+        if robot_type == 0 and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type > 60 and robot_type <= 70 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type == 1 and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > 70 and can_build_robot(UnitType.SPLASHER, next_loc):
-            build_robot(UnitType.SPLASHER, next_loc)
-            log("BUILT A SPLASHER")
+        if robot_type == 2 and can_build_robot(UnitType.SPLASHER, next_loc):
+            set_indicator_string("SPLASHER NOT IMPLEMENTED YET")
+            #build_robot(RobotType.SPLASHER, next_loc)
+            #log("BUILT A SPLASHER")
     else:
         # Otherwise, tick down the number of remaining save turns
         set_indicator_string(f"Saving for {save_turns} more turns")
@@ -114,18 +104,13 @@ def run_tower():
 
         # If we are not currently saving and we receive the save chips message, start saving
         if not should_save and m.get_bytes() == int(MessageType.SAVE_CHIPS):
-            save_turns = 50
+            save_turns = 75
             should_save = True
 
-    # TODO: can we attack other bots?   
-    nearbyRobots = sense_nearby_robots()
-    for robot in nearbyRobots:
-        if (can_attack(robot.get_location())):
-            attack(robot.get_location())
+    # TODO: can we attack other bots?
+
 
 def run_soldier():
-    global target_of_soldier
-    global targets
     # Sense information about all visible nearby tiles.
     nearby_tiles = sense_nearby_map_infos()
 
@@ -147,8 +132,8 @@ def run_soldier():
 
         # Mark the pattern we need to draw to build a tower here if we haven't already.
         should_mark = cur_ruin.get_map_location().subtract(dir)
-        if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-            mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+        if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(UnitType.LEVEL_ONE_PAINT_TOWER, target_loc):
+            mark_tower_pattern(UnitType.LEVEL_ONE_PAINT_TOWER, target_loc)
             log("Trying to build a tower at " + str(target_loc))
 
         # Fill in any spots in the pattern with the appropriate paint.
@@ -159,22 +144,16 @@ def run_soldier():
                     attack(pattern_tile.get_map_location(), use_secondary)
 
         # Complete the ruin if we can.
-        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+        if can_complete_tower_pattern(UnitType.LEVEL_ONE_PAINT_TOWER, target_loc):
+            complete_tower_pattern(UnitType.LEVEL_ONE_PAINT_TOWER, target_loc)
             set_timeline_marker("Tower built", 0, 255, 0)
             log("Built a tower at " + str(target_loc) + "!")
 
     # Move and attack randomly if no objective.
-    if is_searchsoldier == False:
-        dir = directions[random.randint(0, len(directions) - 1)]
-        next_loc = get_location().add(dir)
-        if can_move(dir):
-            move(dir)
-    elif target_of_soldier is not None:
-        if get_location() == target_of_soldier:
-            log("Reached target, now changing to new target")
-            target_of_soldier = targets[random.randint(0, len(targets)-1)]
-        bug2(target_of_soldier)
+    dir = directions[random.randint(0, len(directions) - 1)]
+    next_loc = get_location().add(dir)
+    if can_move(dir):
+        move(dir)
 
     # Try to paint beneath us as we walk to avoid paint penalties.
     # Avoiding wasting paint by re-painting our own tiles.
@@ -186,34 +165,11 @@ def run_soldier():
 def run_mopper():
     if should_save and len(known_towers) > 0:
         # Move to first known tower if we are saving
-        cur_tower = None
-        cur_dist = 9999999
-        for tower in known_towers:
-            check_dist = tower.get_map_location().distance_squared_to(get_location())
-            if check_dist < cur_dist:
-                cur_dist = check_dist
-                cur_tower = tower
-        dir = get_location().direction_to(cur_tower)
+        dir = get_location().direction_to(known_towers[0])
         set_indicator_string(f"Returning to {known_towers[0]}")
-        if cur_tower != None:
-            bug2(cur_tower)
+        if can_move(dir):
+            move(dir)
 
-    nearby_tiles = sense_nearby_map_infos()
-    cur_ruin = None
-    cur_dist = 9999999
-    for tile in nearby_tiles:
-        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) == None:
-            check_dist = tile.get_map_location().distance_squared_to(get_location())
-            if check_dist < cur_dist:
-                cur_dist = check_dist
-                cur_ruin = tile
-    if cur_ruin != None:
-        target_loc = cur_ruin.get_map_location()
-        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-                complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
-                set_timeline_marker("Tower built", 0, 255, 0)
-                log("Built a tower at " + str(target_loc) + "!")
-    
     # Move and attack randomly.
     dir = directions[random.randint(0, len(directions) - 1)]
     next_loc = get_location().add(dir)
@@ -235,28 +191,6 @@ def run_mopper():
         update_friendly_towers()
         check_nearby_ruins()
 
-def run_splasher():
-    nearby_tiles = sense_nearby_map_infos()
-    cur_ruin = None
-    cur_dist = 9999999
-    for tile in nearby_tiles:
-        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) == None:
-            check_dist = tile.get_map_location().distance_squared_to(get_location())
-            if check_dist < cur_dist:
-                cur_dist = check_dist
-                cur_ruin = tile
-    if cur_ruin != None:
-        target_loc = cur_ruin.get_map_location()
-        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-                complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
-                set_timeline_marker("Tower built", 0, 255, 0)
-                log("Built a tower at " + str(target_loc) + "!")
-    dir = directions[random.randint(0, len(directions) - 1)]
-    next_loc = get_location().add(dir)
-    if can_move(dir):
-        move(dir)
-    if can_attack(next_loc):
-        attack(next_loc)
 
 def update_friendly_towers():
     global should_save

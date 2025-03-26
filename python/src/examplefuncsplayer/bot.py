@@ -122,7 +122,7 @@ def run_mopper():
         move(dir)
     if can_mop_swing(dir):
         mop_swing(dir)
-        log("Mop Swing! Booyah!");
+        log("Mop Swing! Booyah!")
     elif can_attack(next_loc):
         attack(next_loc)
 

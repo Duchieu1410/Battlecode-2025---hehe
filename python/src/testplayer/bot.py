@@ -51,6 +51,14 @@ searchsoldier_type = [False] * 8
 target_of_soldier = MapLocation(100000, 100000)
 targets = [MapLocation(height-1,0), MapLocation(0,0), MapLocation(0, width-1), MapLocation(height-1, width-1)]
 
+# Mopper Variables
+is_searchmopper = True
+target_of_mopper = MapLocation(100000, 100000)
+
+# Splasher Variables
+is_searchsplasher= True
+target_of_splasher = MapLocation(100000, 100000)
+
 def turn():
     """
     MUST be defined for robot to run
@@ -93,13 +101,13 @@ def run_tower():
 
         # Pick a random robot type to build.
         robot_type = random.randint(1, 100)
-        if robot_type <= 60 and can_build_robot(UnitType.SOLDIER, next_loc):
+        if robot_type <= 50 and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type > 60 and robot_type <= 70 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type > 50 and robot_type <= 55 and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > 70 and can_build_robot(UnitType.SPLASHER, next_loc):
+        if robot_type <= 100 and robot_type > 55 and can_build_robot(UnitType.SPLASHER, next_loc):
             build_robot(UnitType.SPLASHER, next_loc)
             log("BUILT A SPLASHER")
     else:
@@ -184,6 +192,8 @@ def run_soldier():
 
 
 def run_mopper():
+    global target_of_mopper
+    global targets
     if should_save and len(known_towers) > 0:
         # Move to first known tower if we are saving
         cur_tower = None
@@ -196,7 +206,8 @@ def run_mopper():
         dir = get_location().direction_to(cur_tower)
         set_indicator_string(f"Returning to {known_towers[0]}")
         if cur_tower != None:
-            bug2(cur_tower)
+            next_dir = bug2(cur_tower)
+            move(next_dir)
 
     nearby_tiles = sense_nearby_map_infos()
     cur_ruin = None
@@ -209,21 +220,39 @@ def run_mopper():
                 cur_ruin = tile
     if cur_ruin != None:
         target_loc = cur_ruin.get_map_location()
+        for tile in sense_nearby_map_infos(cur_ruin, 8):
+            if tile.get_paint().is_enemy() == True:
+                if can_attack(tile.get_map_location()):
+                    attack(tile.get_map_location())
         if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
                 complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
                 set_timeline_marker("Tower built", 0, 255, 0)
                 log("Built a tower at " + str(target_loc) + "!")
     
     # Move and attack randomly.
-    dir = directions[random.randint(0, len(directions) - 1)]
-    next_loc = get_location().add(dir)
-    if can_move(dir):
-        move(dir)
-    if can_mop_swing(dir):
-        mop_swing(dir)
-        log("Mop Swing! Booyah!")
-    elif can_attack(next_loc):
-        attack(next_loc)
+    if is_searchmopper == False:
+        dir = directions[random.randint(0, len(directions) - 1)]
+        next_loc = get_location().add(dir)
+        if can_move(dir):
+            move(dir)
+        if can_mop_swing(dir):
+            mop_swing(dir)
+            log("Mop Swing! Booyah!")
+        elif can_attack(next_loc):
+            attack(next_loc)
+    elif target_of_mopper is not None:
+        if get_location() == target_of_mopper:
+            log("Reached target, now changing to new target")
+            target_of_mopper = targets[random.randint(0, len(targets)-1)]
+        search_dir = bug2(target_of_soldier)
+        next_loc = get_location().add(search_dir)
+        if can_mop_swing(search_dir):
+            mop_swing(search_dir)
+            log("Mop Swing! Booyah!")
+        elif can_attack(next_loc):
+            attack(next_loc)
+        if search_dir is not None:
+            move(search_dir)
 
     # We can also move our code into different methods or classes to better organize it!
     update_enemy_robots()

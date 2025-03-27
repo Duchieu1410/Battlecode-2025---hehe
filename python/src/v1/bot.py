@@ -42,6 +42,7 @@ prev_dest = MapLocation(100000, 100000)
 line = set()
 obstacle_start_dist = 0
 tracing_dir = None
+tracing_turns = 0
 
 height = get_map_height()
 width = get_map_width()
@@ -54,16 +55,15 @@ paint_capacity = 0
 is_searchsoldier = True
 is_attackingsoldier = False
 searchsoldier_type = [False] * 8
-target_of_soldier = MapLocation(100000, 100000)
 targets = [MapLocation(height-1,0), MapLocation(0,0), MapLocation(0, width-1), MapLocation(height-1, width-1)]
 
 # Mopper Variables
 is_searchmopper = True
-target_of_mopper = MapLocation(100000, 100000)
 
 # Splasher Variables
 is_searchsplasher= True
-target_of_splasher = MapLocation(100000, 100000)
+
+current_target = MapLocation(100000, 100000)
 
 def turn():
     """
@@ -72,13 +72,12 @@ def turn():
     """
     global turn_count
     global is_messenger
-    global target_of_soldier
-    global target_of_mopper
-    global target_of_splasher
+    global current_target
     global targets
     global is_refilling
     global paint_capacity
     global is_attackingsoldier
+    global tracing_turns
     turn_count += 1
 
     block_width = int(math.sqrt(width)) 
@@ -108,20 +107,17 @@ def turn():
                 is_attackingsoldier = True
             else:   
                 is_attackingsoldier = True
-    
+    if current_target == MapLocation(100000, 100000):
+        current_target = targets[random.randint(0, len(targets)-1)]
+        tracing_turns = 0
+
     if get_type() == UnitType.SOLDIER:
         paint_capacity = 200
-        if target_of_soldier == MapLocation(100000, 100000):
-            target_of_soldier = targets[random.randint(0, len(targets)-1)]
         run_soldier()
     elif get_type() == UnitType.MOPPER:
-        if target_of_mopper == MapLocation(100000, 100000):
-            target_of_mopper = targets[random.randint(0, len(targets)-1)]
         paint_capacity = 100
         run_mopper()
     elif get_type() == UnitType.SPLASHER:
-        if target_of_splasher == MapLocation(100000, 100000):
-            target_of_splasher = targets[random.randint(0, len(targets)-1)]
         paint_capacity = 300
         run_splasher()
     elif get_type().is_tower_type():
@@ -223,8 +219,9 @@ def run_soldier():
         set_indicator_dot(get_location(), 255,0,0)
     # Global variables
     global is_refilling
-    global target_of_soldier
+    global current_target
     global targets
+    global tracing_turns
 
     update_friendly_towers()
 
@@ -296,11 +293,12 @@ def run_soldier():
         next_loc = get_location().add(dir)
         if can_move(dir):
             move(dir)
-    elif target_of_soldier is not None:
-        if get_location() == target_of_soldier:
+    elif current_target is not None:
+        if get_location() == current_target:
             log("Reached target, now changing to new target")
-            target_of_soldier = targets[random.randint(0, len(targets)-1)]
-        search_dir = bug2(target_of_soldier)
+            current_target = targets[random.randint(0, len(targets)-1)]
+            tracing_turns = 0
+        search_dir = bug2(current_target)
         if search_dir is not None:
             move(search_dir)
  
@@ -313,8 +311,9 @@ def run_soldier():
 
 def run_mopper():
     # Global Variables
-    global target_of_mopper
+    global current_target
     global targets
+    global tracing_turns
 
     update_friendly_towers()
     
@@ -367,11 +366,12 @@ def run_mopper():
             log("Mop Swing! Booyah!")
         elif can_attack(next_loc):
             attack(next_loc)
-    elif target_of_mopper is not None:
-        if get_location() == target_of_mopper:
+    elif current_target is not None:
+        if get_location() == current_target:
             log("Reached target, now changing to new target")
-            target_of_mopper = targets[random.randint(0, len(targets)-1)]
-        search_dir = bug2(target_of_mopper)
+            current_target = targets[random.randint(0, len(targets)-1)]
+            tracing_turns = 0
+        search_dir = bug2(current_target)
         if search_dir is not None:
             next_loc = get_location().add(search_dir)
             if can_mop_swing(search_dir):
@@ -393,7 +393,8 @@ def run_mopper():
 def run_splasher():
     # Global variables
     global is_refilling
-    global target_of_splasher
+    global current_target
+    global tracing_turns
 
     update_friendly_towers()
 
@@ -430,11 +431,12 @@ def run_splasher():
             move(dir)
         if can_attack(next_loc):
             attack(next_loc)
-    elif target_of_splasher is not None:
-        if get_location() == target_of_splasher:
+    elif current_target is not None:
+        if get_location() == current_target:
             log("Reached target, now changing to new target")
-            target_of_splasher = targets[random.randint(0, len(targets)-1)]
-        search_dir = bug2(target_of_splasher)
+            current_target = targets[random.randint(0, len(targets)-1)]
+            tracing_turns = 0
+        search_dir = bug2(current_target)
         if search_dir is not None:
             next_loc = get_location().add(search_dir)
             move(search_dir)

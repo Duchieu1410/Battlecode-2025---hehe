@@ -65,6 +65,13 @@ is_searchsplasher= True
 
 current_target = MapLocation(100000, 100000)
 
+# Tower variables
+be_attacked = 0
+soldier_ratio = 70 
+mopper_ratio = 72
+spawned_defenders = 0
+baseratio= int(math.sqrt(math.sqrt(height*width)))
+
 def turn():
     """
     MUST be defined for robot to run
@@ -132,6 +139,12 @@ def run_tower():
     global should_save
     if turn_count >= 75 and get_type() == UnitType.LEVEL_ONE_MONEY_TOWER:
         disintegrate()
+    if turn_count <= baseratio:
+        soldier_ratio = 50
+        mopper_ratio = 55
+    else:
+        soldier_ratio = 50
+        mopper_ratio = 55
     if save_turns == 0:
         # If we have no save turns remaining, start building robots
         should_save = False
@@ -142,15 +155,13 @@ def run_tower():
 
         # Pick a random robot type to build.
         robot_type = random.randint(1, 100)
-        # Pick a random robot type to build.
-        robot_type = random.randint(1, 100)
-        if robot_type <= 50 and can_build_robot(UnitType.SOLDIER, next_loc):
+        if robot_type <= soldier_ratio and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
             log("BUILT A SOLDIER")
-        if robot_type > 50 and robot_type <= 55 and can_build_robot(UnitType.MOPPER, next_loc):
+        if robot_type > soldier_ratio and robot_type <= mopper_ratio and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
             log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > 55 and can_build_robot(UnitType.SPLASHER, next_loc):
+        if robot_type <= 100 and robot_type > mopper_ratio and can_build_robot(UnitType.SPLASHER, next_loc):
             build_robot(UnitType.SPLASHER, next_loc)
             log("BUILT A SPLASHER")
     else:
@@ -390,6 +401,23 @@ def run_mopper():
         update_friendly_towers()
         check_nearby_ruins()
 
+def splasher_profit(cur_loc):
+    team_paint = 0
+    opponent_paint = 0
+    not_painted = 0
+    for tile in sense_nearby_map_infos(cur_loc, 4):
+        if tile is None:
+            continue  # Skip invalid tiles
+        paint = tile.get_paint()
+        if paint != PaintType.EMPTY:
+            if paint.is_ally():
+                team_paint += 1
+            elif paint.is_enemy():
+                opponent_paint += 1
+        else:
+            not_painted += 1
+    return opponent_paint * 2 + not_painted - team_paint
+
 def run_splasher():
     # Global variables
     global is_refilling
@@ -440,7 +468,7 @@ def run_splasher():
         if search_dir is not None:
             next_loc = get_location().add(search_dir)
             move(search_dir)
-            if can_attack(next_loc):
+            if can_attack(next_loc) and splasher_profit(next_loc) >= 6:
                 attack(next_loc)
 
 

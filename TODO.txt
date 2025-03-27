@@ -1,0 +1,4 @@
++ Add immobile mopper that stays at a tower to defend and 
+destroy & recreate to gain paint.
++ Spawn moppers to defend when getting attacked
++ Fix soldier and mopper movement

@@ -61,7 +61,8 @@ targets = [MapLocation(height-1,0), MapLocation(0,0), MapLocation(0, width-1), M
 is_searchmopper = True
 
 # Splasher Variables
-is_searchsplasher= True
+is_searchsplasher = True
+is_attackingsplasher = False
 
 current_target = MapLocation(100000, 100000)
 
@@ -85,6 +86,7 @@ def turn():
     global paint_capacity
     global is_attackingsoldier
     global tracing_turns
+    global is_attackingsplasher
     turn_count += 1
 
     block_width = int(math.sqrt(width)) 
@@ -114,6 +116,11 @@ def turn():
                 is_attackingsoldier = True
             else:   
                 is_attackingsoldier = True
+    if get_type() == UnitType.SPLASHER:
+        if get_id() % 3 == 0:
+            is_attackingsplasher = False
+        else:
+            is_attackingsplasher = True
     if current_target == MapLocation(100000, 100000):
         current_target = targets[random.randint(0, len(targets)-1)]
         tracing_turns = 0
@@ -469,6 +476,15 @@ def run_splasher():
             log("Built a tower at " + str(target_loc) + "!")
 
     update_friendly_towers()
+
+    if is_attackingsplasher:
+        for tile in nearby_tiles:
+            if tile.get_paint().is_enemy():
+                opptile_dir = get_location().direction_to(tile.get_map_location())
+                if can_move(opptile_dir):
+                    move(opptile_dir)
+                if can_attack(tile.get_map_location()):
+                    attack(tile.get_map_location())
 
     if is_searchsplasher == False:
         dir = directions[random.randint(0, len(directions) - 1)]

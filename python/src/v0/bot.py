@@ -78,18 +78,18 @@ def turn():
     global paint_capacity
     turn_count += 1
 
-    # block_width = math.sqrt(width)
-    # block_height = math.sqrt(height)
-    # i = 0
-    # while i < width:
-    #     targets.append(MapLocation(0,i))
-    #     targets.append(MapLocation(height-1,i))
-    #     i += block_width
-    # i = 0
-    # while i < height:
-    #     targets.append(MapLocation(i,0))
-    #     targets.append(MapLocation(i,width-1))
-    #     i += block_height
+    block_width = math.sqrt(width)
+    block_height = math.sqrt(height)
+    i = 0
+    while i < width:
+        targets.append(MapLocation(0,i))
+        targets.append(MapLocation(height-1,i))
+        i += block_width
+    i = 0
+    while i < height:
+        targets.append(MapLocation(i,0))
+        targets.append(MapLocation(i,width-1))
+        i += block_height
     # Assign messenger to about half of our moppers
     # if get_type() == UnitType.MOPPER and get_id() % 3 == 0:
     #     is_messenger = True

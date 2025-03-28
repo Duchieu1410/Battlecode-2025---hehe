@@ -141,7 +141,7 @@ def run_tower():
         disintegrate()
     if turn_count <= baseratio:
         soldier_ratio = 50
-        mopper_ratio = 55
+        mopper_ratio = 70
     else:
         soldier_ratio = 50
         mopper_ratio = 55
@@ -237,7 +237,7 @@ def run_soldier():
     update_friendly_towers()
 
     #Checks if refilling is needed
-    if get_paint() <= 20:
+    if get_paint() <= 35:
         is_refilling = True
     if is_refilling == True: 
         refill_paint()
@@ -427,7 +427,7 @@ def run_splasher():
     update_friendly_towers()
 
     # Checks if needs refill
-    if get_paint() <= 20:
+    if get_paint() <= 30:
         is_refilling = True
     if is_refilling == True: 
         refill_paint()

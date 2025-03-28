@@ -69,8 +69,8 @@ current_target = MapLocation(100000, 100000)
 
 # Tower variables
 be_attacked = 0
-soldier_ratio = 100 
-mopper_ratio = 100
+soldier_ratio = 70 
+mopper_ratio = 72
 spawned_defenders = 0
 baseratio= int(math.sqrt(math.sqrt(height*width)))
 
@@ -256,19 +256,22 @@ def mark_patterns():
             if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, tile.get_map_location()):
                 complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, tile.get_map_location())
         if can_complete_resource_pattern(tile.get_map_location()):
-            complete_resource_pattern(tile.get_map_location)
+            complete_resource_pattern(tile.get_map_location())
 
 def SRP_mark():
     global SRP_position
     if SRP_position is None:
         return
-    if can_mark_resource_pattern(SRP_position) is not True: 
+    if not can_mark_resource_pattern(SRP_position): 
         return
     has_enemy_tile = False
-    for tile in sense_nearby_map_infos(SRP_position, 8):
+    ally_paint_count = 0
+    for tile in sense_nearby_map_infos(SRP_position, 1):
         if tile.get_paint().is_enemy():
             has_enemy_tile = True
             break
+        if tile.get_paint().is_ally():
+            ally_paint_count += 1
     if has_enemy_tile:
         return
     mark_resource_pattern(SRP_position)
@@ -324,6 +327,15 @@ def run_soldier():
             if tile_robot is not None and tile_robot.get_type().is_tower_type() and not tile_robot.get_team() == get_team():
                 cur_enemy_tower = tile.get_map_location()
     
+    # Attacks enemy tower 
+    if cur_enemy_tower is not None and is_attackingsoldier:
+        dir = get_location().direction_to(cur_enemy_tower)
+        if can_move(dir):
+            move(dir)
+        if can_attack(cur_enemy_tower):
+            log("Gotta kill em all")
+            attack(cur_enemy_tower)
+
     if cur_ruin is not None:
         target_loc = cur_ruin.get_map_location()
         dir = get_location().direction_to(target_loc)
@@ -351,21 +363,12 @@ def run_soldier():
 
     mark_patterns()
 
-    # Attacks enemy tower 
-    if cur_enemy_tower is not None and is_attackingsoldier:
-        dir = get_location().direction_to(cur_enemy_tower)
-        if can_move(dir):
-            move(dir)
-        if can_attack(cur_enemy_tower):
-            log("Gotta kill em all")
-            attack(cur_enemy_tower)
-
     update_friendly_towers()
 
-    for tile in nearby_tiles:
-        if tile.get_paint() == PaintType.EMPTY:
-            if can_attack(tile.get_map_location()):
-                attack(tile.get_map_location())
+    # for tile in nearby_tiles:
+    #     if tile.get_paint() == PaintType.EMPTY:
+    #         if can_attack(tile.get_map_location()):
+    #             attack(tile.get_map_location())
             
 
     # Movement
@@ -410,7 +413,7 @@ def run_mopper():
         dir = get_location().direction_to(cur_tower)
         set_indicator_string(f"Returning to {known_towers[0]}")
         if cur_tower != None:
-            next_dir = bug1(cur_tower)
+            next_dir = bug2(cur_tower)
             move(next_dir)
 
     # Finds ruins nearby and checks if it is buildable

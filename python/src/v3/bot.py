@@ -149,7 +149,7 @@ def run_tower():
     # Global variables
     global save_turns
     global should_save
-    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 4:
+    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 3:
         disintegrate()
     if turn_count <= baseratio:
         soldier_ratio = 50
@@ -231,7 +231,7 @@ def refill_paint():
         # Find robot at the tower's location
         dir = get_location().direction_to(cur_tower)
         set_indicator_string(f"Returning to {cur_tower}")
-        next_dir = bug2(cur_tower)
+        next_dir = bug1(cur_tower)
         if next_dir is not None:
             move(next_dir)
         if can_sense_robot_at_location(cur_tower):
@@ -333,7 +333,7 @@ def run_soldier():
             log("Reached target, now changing to new target")
             current_target = targets[random.randint(0, len(targets)-1)]
             tracing_turns = 0
-        search_dir = bug2(current_target)
+        search_dir = bug1(current_target)
         if search_dir is not None:
             move(search_dir)
  
@@ -364,7 +364,7 @@ def run_mopper():
         dir = get_location().direction_to(cur_tower)
         set_indicator_string(f"Returning to {known_towers[0]}")
         if cur_tower != None:
-            next_dir = bug2(cur_tower)
+            next_dir = bug1(cur_tower)
             move(next_dir)
 
     # Finds ruins nearby and checks if it is buildable
@@ -391,29 +391,29 @@ def run_mopper():
 
     update_friendly_towers()
 
+    enemy_robots = sense_nearby_robots(team=get_team().opponent())    
+    for robot in enemy_robots:
+        robot_dir = get_direction_to(robot.get_location())
+        if can_mop_swing(robot_dir):
+                mop_swing(robot_dir)
+
     # Move and attack.
     if is_searchmopper == False:
         dir = directions[random.randint(0, len(directions) - 1)]
         next_loc = get_location().add(dir)
         if can_move(dir):
             move(dir)
-        if can_mop_swing(dir):
-            mop_swing(dir)
-            log("Mop Swing! Booyah!")
-        elif can_attack(next_loc):
+        if can_attack(next_loc):
             attack(next_loc)
     elif current_target is not None:
         if get_location() == current_target:
             log("Reached target, now changing to new target")
             current_target = targets[random.randint(0, len(targets)-1)]
             tracing_turns = 0
-        search_dir = bug2(current_target)
+        search_dir = bug1(current_target)
         if search_dir is not None:
             next_loc = get_location().add(search_dir)
-            if can_mop_swing(search_dir):
-                mop_swing(search_dir)
-                log("Mop Swing! Booyah!")
-            elif can_attack(next_loc):
+            if can_attack(next_loc):
                 attack(next_loc)
             move(search_dir)
 
@@ -478,14 +478,20 @@ def run_splasher():
     update_friendly_towers()
 
     if is_attackingsplasher:
+        best_enemy_tile = None
+        best_enemy_profit = 0
         for tile in nearby_tiles:
             if tile.get_paint().is_enemy():
-                opptile_dir = get_location().direction_to(tile.get_map_location())
-                if can_move(opptile_dir):
-                    move(opptile_dir)
-                if can_attack(tile.get_map_location()):
-                    attack(tile.get_map_location())
-
+                tile_location = tile.get_map_location()
+                splash_profit_of_tile = splasher_profit(tile_location)
+                if splasher_profit(tile_location) > best_enemy_profit:
+                    best_enemy_tile = tile_location
+                    best_enemy_profit = splash_profit_of_tile
+        opptile_dir = get_location().direction_to(best_enemy_tile)
+        if can_move(opptile_dir):
+            move(opptile_dir)
+        if can_attack(best_enemy_tile):
+            attack(best_enemy_tile)
     if is_searchsplasher == False:
         dir = directions[random.randint(0, len(directions) - 1)]
         next_loc = get_location().add(dir)
@@ -498,7 +504,7 @@ def run_splasher():
             log("Reached target, now changing to new target")
             current_target = targets[random.randint(0, len(targets)-1)]
             tracing_turns = 0
-        search_dir = bug2(current_target)
+        search_dir = bug1(current_target)
         if search_dir is not None:
             next_loc = get_location().add(search_dir)
             move(search_dir)
@@ -604,7 +610,7 @@ def bug1(target):
 
         # try to move in target direction
         if can_move(dir):
-            move(dir)
+            return dir
         else:
             is_tracing = True
             tracing_dir = dir
@@ -630,18 +636,19 @@ def bug1(target):
             # go along perimeter of obstacle
             if can_move(tracing_dir):
                 # move forward & try to turn right
-                move(tracing_dir)
+                old_tracing_dir = tracing_dir
                 tracing_dir = tracing_dir.rotate_right()
                 tracing_dir = tracing_dir.rotate_right()
+                return old_tracing_dir
             else:
                 # turn left because we can't move forward; keep turning left until we can move again
                 for i in range(8):
                     tracing_dir = tracing_dir.rotate_left()
                     if can_move(tracing_dir):
-                        move(tracing_dir)
+                        old_tracing_dir = tracing_dir
                         tracing_dir = tracing_dir.rotate_right()
                         tracing_dir = tracing_dir.rotate_right()
-                        break
+                        return old_tracing_dir
             
 #Bug 2
 

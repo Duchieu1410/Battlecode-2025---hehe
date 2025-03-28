@@ -266,7 +266,7 @@ def SRP_mark():
         return
     has_enemy_tile = False
     ally_paint_count = 0
-    for tile in sense_nearby_map_infos(SRP_position, 1):
+    for tile in sense_nearby_map_infos(SRP_position, 8):
         if tile.get_paint().is_enemy():
             has_enemy_tile = True
             break
@@ -329,12 +329,25 @@ def run_soldier():
     
     # Attacks enemy tower 
     if cur_enemy_tower is not None and is_attackingsoldier:
-        dir = get_location().direction_to(cur_enemy_tower)
-        if can_move(dir):
-            move(dir)
-        if can_attack(cur_enemy_tower):
-            log("Gotta kill em all")
-            attack(cur_enemy_tower)
+        enemy_tower_dist = get_location().distance_squared_to(cur_enemy_tower)
+        dir = bug2(cur_enemy_tower)
+        if enemy_tower_dist > 4:
+            if dir is not None:
+                move(dir)
+            if can_attack(cur_enemy_tower):
+                log("Gotta kill em all")
+                attack(cur_enemy_tower)
+        else:
+            if can_attack(cur_enemy_tower):
+                log("Gotta kill em all")
+                attack(cur_enemy_tower)
+            away = get_location().direction_to(cur_enemy_tower).opposite()
+            if can_move(away):
+                move(away)
+            elif can_move(away.rotate_left()):
+                move(away.rotate_left())
+            elif can_move(away.rotate_right()):
+                move(away.rotate_right())
 
     if cur_ruin is not None:
         target_loc = cur_ruin.get_map_location()

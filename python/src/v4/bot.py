@@ -116,12 +116,12 @@ def turn():
                 is_attackingsoldier = False
         else:
             if get_id() % 4 == 0:
-                is_attackingsoldier = True
-            else:   
                 is_attackingsoldier = False
+            else:   
+                is_attackingsoldier = True
     if get_type() == UnitType.SPLASHER:
         if get_id() % 3 == 0:
-            is_attackingsplasher = False
+            is_attackingsplasher = True
         else:
             is_attackingsplasher = True
     if current_target is not None and current_target == MapLocation(100000, 100000):
@@ -148,11 +148,27 @@ def check_nearby_opp_paint():
             return True
     return False
 
+def build_tower_type(loc):
+    tower_count = get_num_towers()
+    if height * width <= 800:
+        if tower_count % 3 == 0:
+            return UnitType.LEVEL_ONE_PAINT_TOWER
+        else:
+            return UnitType.LEVEL_ONE_MONEY_TOWER
+    else:
+        mid_height = height // 2
+        mid_width = width // 2
+        sq_width = int(math.sqrt(width)) // 2
+        sq_height = int(math.sqrt(height)) // 2
+        if loc.x >= mid_width - sq_width and loc.x <= mid_width + sq_width and loc.y >= mid_height - sq_height and loc.y <= mid_height + sq_height and tower_count >= 6:
+            return UnitType.LEVEL_ONE_DEFENSE_TOWER
+        return UnitType.LEVEL_ONE_MONEY_TOWER
+
 def run_tower():
     # Global variables
     global save_turns
     global should_save
-    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 4:
+    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 4 and get_money() >= 2500:
         disintegrate()
     if turn_count <= baseratio:
         soldier_ratio = 50
@@ -208,7 +224,7 @@ def upgrade_nearby_paint_towers():
             continue
 
         ally_loc = ally.location
-        if (ally.get_type() == UnitType.LEVEL_ONE_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER) and can_upgrade_tower(ally_loc):
+        if ((ally.get_type() == UnitType.LEVEL_ONE_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_ONE_DEFENSE_TOWER) and get_num_towers() >= 5) and can_upgrade_tower(ally_loc):
             upgrade_tower(ally_loc)
 
 def refill_paint():
@@ -255,8 +271,9 @@ def refill_paint():
 def mark_patterns():
     for tile in sense_nearby_map_infos():
         if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) == None:
-            if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, tile.get_map_location()):
-                complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, tile.get_map_location())
+            tile_loc = tile.get_map_location()
+            if can_complete_tower_pattern(build_tower_type(tile_loc), tile_loc):
+                complete_tower_pattern(build_tower_type(tile_loc), tile_loc)
 
 def can_SRP():
     if not can_mark_resource_pattern(get_location()):
@@ -354,8 +371,8 @@ def run_soldier():
 
         # Mark the pattern we need to draw to build a tower here if we haven't already.
         should_mark = cur_ruin.get_map_location().subtract(dir)
-        if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-            mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+        if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(build_tower_type(target_loc), target_loc):
+            mark_tower_pattern(build_tower_type(target_loc), target_loc)
             log("Trying to build a tower at " + str(target_loc))
         
         # Fill in any spots in the pattern with the appropriate paint.
@@ -366,8 +383,8 @@ def run_soldier():
                     attack(pattern_tile.get_map_location(), use_secondary)
 
         # Complete the ruin if we can.
-        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+        if can_complete_tower_pattern(build_tower_type(target_loc), target_loc):
+            complete_tower_pattern(build_tower_type(target_loc), target_loc)
             set_timeline_marker("Tower built", 0, 255, 0)
             log("Built a tower at " + str(target_loc) + "!")
 
@@ -428,6 +445,10 @@ def run_soldier():
     current_tile = sense_map_info(get_location())
     if not current_tile.get_paint().is_ally() and can_attack(get_location()):
         attack(get_location())
+    else:
+        for tile in sense_nearby_map_infos(get_location(), 3):
+            if tile.get_paint() == PaintType.EMPTY and can_attack(tile.get_map_location()):
+                attack(tile.get_map_location())
 
 
 def run_mopper():

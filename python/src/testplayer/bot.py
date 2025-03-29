@@ -116,16 +116,16 @@ def turn():
                 is_attackingsoldier = False
         else:
             if get_id() % 4 == 0:
-                is_attackingsoldier = False
-            else:   
                 is_attackingsoldier = True
+            else:   
+                is_attackingsoldier = False
     if get_type() == UnitType.SPLASHER:
         if get_id() % 3 == 0:
             is_attackingsplasher = True
         else:
             is_attackingsplasher = True
     if current_target is not None and current_target == MapLocation(100000, 100000):
-        current_target = targets[random.randint(0, len(targets)-1)]
+        current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
         tracing_turns = 0
 
     if get_type() == UnitType.SOLDIER:
@@ -150,25 +150,25 @@ def check_nearby_opp_paint():
 
 def build_tower_type(loc):
     tower_count = get_num_towers()
-    if height * width <= 800:
-        if tower_count % 3 == 0:
-            return UnitType.LEVEL_ONE_PAINT_TOWER
-        else:
-            return UnitType.LEVEL_ONE_MONEY_TOWER
-    else:
-        mid_height = height // 2
-        mid_width = width // 2
-        sq_width = int(math.sqrt(width)) // 2
-        sq_height = int(math.sqrt(height)) // 2
-        if loc.x >= mid_width - sq_width and loc.x <= mid_width + sq_width and loc.y >= mid_height - sq_height and loc.y <= mid_height + sq_height and tower_count >= 6:
-            return UnitType.LEVEL_ONE_DEFENSE_TOWER
-        return UnitType.LEVEL_ONE_MONEY_TOWER
+    # if height * width <= 800:
+    #     if tower_count % 3 == 0:
+    #         return UnitType.LEVEL_ONE_PAINT_TOWER
+    #     else:
+    #         return UnitType.LEVEL_ONE_MONEY_TOWER
+    # else:
+    mid_height = height // 2
+    mid_width = width // 2
+    sq_width = int(math.sqrt(width)) // 2
+    sq_height = int(math.sqrt(height)) // 2
+    if loc.x >= mid_width - sq_width and loc.x <= mid_width + sq_width and loc.y >= mid_height - sq_height and loc.y <= mid_height + sq_height and tower_count >= 5:
+        return UnitType.LEVEL_ONE_DEFENSE_TOWER
+    return UnitType.LEVEL_ONE_MONEY_TOWER
 
 def run_tower():
     # Global variables
     global save_turns
     global should_save
-    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 4 and get_money() >= 2500:
+    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 4:
         disintegrate()
     if turn_count <= baseratio:
         soldier_ratio = 50
@@ -224,7 +224,7 @@ def upgrade_nearby_paint_towers():
             continue
 
         ally_loc = ally.location
-        if ((ally.get_type() == UnitType.LEVEL_ONE_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_ONE_DEFENSE_TOWER) and get_num_towers() >= 5) and can_upgrade_tower(ally_loc):
+        if (ally.get_type() == UnitType.LEVEL_ONE_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_ONE_DEFENSE_TOWER) and can_upgrade_tower(ally_loc):
             upgrade_tower(ally_loc)
 
 def refill_paint():
@@ -429,7 +429,7 @@ def run_soldier():
     elif current_target is not None:
         if is_attackingsoldier == False and (get_location().distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
-            current_target = targets[random.randint(0, len(targets)-1)]
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
             tracing_turns = 0
             move_count = 0
         if is_attackingsoldier and get_location().distance_squared_to(current_target) <= 2:
@@ -524,7 +524,7 @@ def run_mopper():
     elif current_target is not None:
         if get_location().distance_squared_to(current_target) <= 5:
             log("Reached target, now changing to new target")
-            current_target = targets[random.randint(0, len(targets)-1)]
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
             tracing_turns = 0
         search_dir = bug2(current_target)
         if search_dir is not None:
@@ -604,7 +604,7 @@ def run_splasher():
     elif current_target is not None:
         if is_attackingsplasher == False and (cur_loc.distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
-            current_target = targets[random.randint(0, len(targets)-1)]
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
             tracing_turns = 0
             move_count = 0
         if is_attackingsplasher and cur_loc.distance_squared_to(current_target) <= 2:

@@ -125,7 +125,7 @@ def turn():
         else:
             is_attackingsplasher = True
     if current_target is not None and current_target == MapLocation(100000, 100000):
-        current_target = targets[random.randint(0, len(targets)-1)]
+        current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
         tracing_turns = 0
 
     if get_type() == UnitType.SOLDIER:
@@ -412,7 +412,7 @@ def run_soldier():
     elif current_target is not None:
         if is_attackingsoldier == False and (get_location().distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
-            current_target = targets[random.randint(0, len(targets)-1)]
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
             tracing_turns = 0
             move_count = 0
         if is_attackingsoldier and get_location().distance_squared_to(current_target) <= 2:
@@ -507,7 +507,7 @@ def run_mopper():
     elif current_target is not None:
         if get_location().distance_squared_to(current_target) <= 5:
             log("Reached target, now changing to new target")
-            current_target = targets[random.randint(0, len(targets)-1)]
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
             tracing_turns = 0
         search_dir = bug2(current_target)
         if search_dir is not None:
@@ -587,7 +587,7 @@ def run_splasher():
     elif current_target is not None:
         if is_attackingsplasher == False and (cur_loc.distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
-            current_target = targets[random.randint(0, len(targets)-1)]
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
             tracing_turns = 0
             move_count = 0
         if is_attackingsplasher and cur_loc.distance_squared_to(current_target) <= 2:

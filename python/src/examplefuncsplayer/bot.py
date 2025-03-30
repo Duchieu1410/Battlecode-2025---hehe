@@ -121,11 +121,11 @@ def turn():
                 is_attackingsoldier = False
     if get_type() == UnitType.SPLASHER:
         if get_id() % 3 == 0:
-            is_attackingsplasher = True
+            is_attackingsplasher = False
         else:
             is_attackingsplasher = True
     if current_target is not None and current_target == MapLocation(100000, 100000):
-        current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+        current_target = targets[random.randint(0, len(targets)-1)]
         tracing_turns = 0
 
     if get_type() == UnitType.SOLDIER:
@@ -152,7 +152,7 @@ def run_tower():
     # Global variables
     global save_turns
     global should_save
-    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 4:
+    if turn_count >= 65 and (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and check_nearby_opp_paint() == False and get_num_towers() >= 3:
         disintegrate()
     if turn_count <= baseratio:
         soldier_ratio = 50
@@ -412,7 +412,7 @@ def run_soldier():
     elif current_target is not None:
         if is_attackingsoldier == False and (get_location().distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
-            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+            current_target = targets[random.randint(0, len(targets)-1)]
             tracing_turns = 0
             move_count = 0
         if is_attackingsoldier and get_location().distance_squared_to(current_target) <= 2:
@@ -428,10 +428,6 @@ def run_soldier():
     current_tile = sense_map_info(get_location())
     if not current_tile.get_paint().is_ally() and can_attack(get_location()):
         attack(get_location())
-    else:
-        for tile in sense_nearby_map_infos(get_location(), 3):
-            if tile.get_paint() == PaintType.EMPTY and can_attack(tile.get_map_location()):
-                attack(tile.get_map_location())
 
 
 def run_mopper():
@@ -507,7 +503,7 @@ def run_mopper():
     elif current_target is not None:
         if get_location().distance_squared_to(current_target) <= 5:
             log("Reached target, now changing to new target")
-            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+            current_target = targets[random.randint(0, len(targets)-1)]
             tracing_turns = 0
         search_dir = bug2(current_target)
         if search_dir is not None:
@@ -587,7 +583,7 @@ def run_splasher():
     elif current_target is not None:
         if is_attackingsplasher == False and (cur_loc.distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
-            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+            current_target = targets[random.randint(0, len(targets)-1)]
             tracing_turns = 0
             move_count = 0
         if is_attackingsplasher and cur_loc.distance_squared_to(current_target) <= 2:

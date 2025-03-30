@@ -175,7 +175,7 @@ def run_tower():
     # Global variables
     global save_turns
     global should_save
-    if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 70 and check_nearby_opp_paint() == False and get_money() >= 5000 and get_num_towers() >= 2:
+    if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 70 and check_nearby_opp_paint() == False and get_money() >= 5000 and get_num_towers() >= 3:
         disintegrate()
 
     dir = directions[random.randint(0, len(directions) - 1)]
@@ -186,6 +186,12 @@ def run_tower():
             build_robot(UnitType.MOPPER, next_loc)
         else:
             build_robot(UnitType.SOLDIER, next_loc)
+            build_robot(UnitType.SPLASHER, next_loc)
+        return
+    if get_round_num() == 2:
+        if get_type() == UnitType.LEVEL_ONE_PAINT_TOWER:
+            build_robot(UnitType.MOPPER, next_loc)
+        else:
             build_robot(UnitType.SPLASHER, next_loc)
         return
     tower_count = get_num_towers()

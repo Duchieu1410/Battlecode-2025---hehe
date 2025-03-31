@@ -178,7 +178,6 @@ def check_nearby_opp_paint():
     return False
 
 def build_tower_type(loc):
-    return UnitType.LEVEL_ONE_MONEY_TOWER
     tower_count = get_num_towers()
     if get_money() <= 1000:
         return UnitType.LEVEL_ONE_MONEY_TOWER

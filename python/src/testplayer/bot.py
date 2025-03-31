@@ -88,6 +88,7 @@ soldier_ratio = 70
 mopper_ratio = 72
 spawned_defenders = 0
 baseratio= int(math.sqrt(math.sqrt(height*width)))
+has_spawned_mopper = False
 
 def turn():
     """
@@ -245,13 +246,17 @@ def run_tower():
     # if cur_round >= 700 and get_num_towers() <= 4:
     #     soldier_ratio = 50
     #     mopper_ratio = 55
-
-    if cur_round <= 75:
-        soldier_ratio = 99
-        mopper_ratio = 100
-    elif cur_round <= 200:
-        soldier_ratio = 65
-        mopper_ratio = 67
+    tower_count = get_num_towers()
+    if height * width >= 2000:
+        if tower_count <= 4:
+            soldier_ratio = 80
+            mopper_ratio = 82
+        elif tower_count <= 8:
+            soldier_ratio = 50
+            mopper_ratio = 53
+        else:
+            soldier_ratio = 45
+            mopper_ratio = 48
     else:
         soldier_ratio = 50
         mopper_ratio = 55
@@ -291,6 +296,9 @@ def run_tower():
     for robot in nearbyRobots:
         if (can_attack(robot.get_location())):
             attack(robot.get_location())
+    # t_type = get_type()
+    # if len(nearbyRobots) > 0 and has_spawned_mopper == False and (t_type == UnitType.LEVEL_ONE_PAINT_TOWER or t_type == UnitType.LEVEL_TWO_PAINT_TOWER or t_type == UnitType.LEVEL_THREE_PAINT_TOWER):
+    #     if can_build_robot( )
 
 def upgrade_nearby_paint_towers():
     # Search for all nearby robots

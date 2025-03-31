@@ -132,7 +132,7 @@ def turn():
     # Sets a part of soldiers as attackers
     if get_type() == UnitType.SOLDIER:
         if round_num <= 300: 
-            if get_id() % 4 == 0:
+            if get_id() % 2 == 0:
                 is_attackingsoldier = True
             else:
                 is_attackingsoldier = False
@@ -245,13 +245,17 @@ def run_tower():
     # if cur_round >= 700 and get_num_towers() <= 4:
     #     soldier_ratio = 50
     #     mopper_ratio = 55
-
-    if cur_round <= 75:
-        soldier_ratio = 99
-        mopper_ratio = 100
-    elif cur_round <= 200:
-        soldier_ratio = 65
-        mopper_ratio = 67
+    tower_count = get_num_towers()
+    if height * width >= 2000:
+        if tower_count <= 4:
+            soldier_ratio = 80
+            mopper_ratio = 84
+        elif tower_count <= 8:
+            soldier_ratio = 65
+            mopper_ratio = 69
+        else:
+            soldier_ratio = 50
+            mopper_ratio = 52
     else:
         soldier_ratio = 50
         mopper_ratio = 55
@@ -526,6 +530,8 @@ def run_soldier():
         #     tower_type = build_tower_type(painting_ruin_loc)
         #     return
         target_loc = cur_ruin.get_map_location()
+        if tower_type == None:
+            tower_type = build_tower_type(target_loc)
         dir = get_location().direction_to(target_loc)
         if can_move(dir):
             move(dir)
@@ -548,6 +554,9 @@ def run_soldier():
             complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
             set_timeline_marker("Tower built", 0, 255, 0)
             log("Built a tower at " + str(target_loc) + "!")
+
+        if sense_robot_at_location(target_loc):
+            tower_type = None
         
     if is_attackingsoldier and (turn_count == 1 or current_target is None):
         rand = random.randint(1,3)

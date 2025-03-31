@@ -132,7 +132,7 @@ def turn():
     # Sets a part of soldiers as attackers
     if get_type() == UnitType.SOLDIER:
         if round_num <= 300: 
-            if get_id() % 4 == 0:
+            if get_id() % 2 == 0:
                 is_attackingsoldier = True
             else:
                 is_attackingsoldier = False
@@ -245,13 +245,17 @@ def run_tower():
     # if cur_round >= 700 and get_num_towers() <= 4:
     #     soldier_ratio = 50
     #     mopper_ratio = 55
-
-    if cur_round <= 75:
-        soldier_ratio = 75
-        mopper_ratio = 76
-    elif cur_round <= 200:
-        soldier_ratio = 65
-        mopper_ratio = 67
+    tower_count = get_num_towers()
+    if height * width >= 2000:
+        if tower_count <= 4:
+            soldier_ratio = 80
+            mopper_ratio = 84
+        elif tower_count <= 8:
+            soldier_ratio = 65
+            mopper_ratio = 69
+        else:
+            soldier_ratio = 50
+            mopper_ratio = 52
     else:
         soldier_ratio = 50
         mopper_ratio = 55
@@ -488,10 +492,10 @@ def run_soldier():
         refill_paint()
         return
     
-    if is_painting_pattern:
-        run_paint_pattern()
-        painting_turns += 1
-        return
+    # if is_painting_pattern:
+    #     run_paint_pattern()
+    #     painting_turns += 1
+    #     return
 
     # Sense information about all visible nearby tiles.
     nearby_tiles = sense_nearby_map_infos()
@@ -513,18 +517,46 @@ def run_soldier():
                 cur_enemy_tower = tile.get_map_location()
 
     if cur_ruin is not None:
-        if cur_dist > 4: 
-            move_dir = bug2(cur_ruin.get_map_location())
-            if move_dir is not None:
-                move(move_dir)
-            return
-        else:
-            is_painting_pattern = True
-            turns_without_attack = 0
-            painting_turns = 0
-            painting_ruin_loc = cur_ruin.get_map_location()
-            tower_type = build_tower_type(painting_ruin_loc)
-            return
+        # if cur_dist > 4: 
+        #     move_dir = bug2(cur_ruin.get_map_location())
+        #     if move_dir is not None:
+        #         move(move_dir)
+        #     return
+        # else:
+        #     is_painting_pattern = True
+        #     turns_without_attack = 0
+        #     painting_turns = 0
+        #     painting_ruin_loc = cur_ruin.get_map_location()
+        #     tower_type = build_tower_type(painting_ruin_loc)
+        #     return
+        target_loc = cur_ruin.get_map_location()
+        if tower_type == None:
+            tower_type = build_tower_type(target_loc)
+        dir = get_location().direction_to(target_loc)
+        if can_move(dir):
+            move(dir)
+
+        # Mark the pattern we need to draw to build a tower here if we haven't already.
+        should_mark = cur_ruin.get_map_location().subtract(dir)
+        if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
+            mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+            log("Trying to build a tower at " + str(target_loc))
+        
+        # Fill in any spots in the pattern with the appropriate paint.
+        for pattern_tile in sense_nearby_map_infos(target_loc, 8):
+            if pattern_tile.get_mark() != pattern_tile.get_paint() and pattern_tile.get_mark() != PaintType.EMPTY:
+                use_secondary = pattern_tile.get_mark() == PaintType.ALLY_SECONDARY
+                if can_attack(pattern_tile.get_map_location()):
+                    attack(pattern_tile.get_map_location(), use_secondary)
+
+        # Complete the ruin if we can.
+        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
+            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+            set_timeline_marker("Tower built", 0, 255, 0)
+            log("Built a tower at " + str(target_loc) + "!")
+
+        if sense_robot_at_location(target_loc):
+            tower_type = None
         
     if is_attackingsoldier and (turn_count == 1 or current_target is None):
         rand = random.randint(1,3)

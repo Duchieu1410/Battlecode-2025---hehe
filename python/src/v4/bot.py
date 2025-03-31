@@ -64,6 +64,8 @@ painting_turns = 0
 turns_without_attack = 0
 painting_ruin_loc = None
 tower_type = None
+is_SRP_builder = False
+SRP_positions = []
 
 paint_tower_pattern = None
 money_tower_pattern = None
@@ -103,6 +105,7 @@ def turn():
     global paint_tower_pattern
     global money_tower_pattern
     global defense_tower_pattern
+    global is_SRP_builder
     turn_count += 1
 
     if turn_count == 1:
@@ -110,24 +113,24 @@ def turn():
         money_tower_pattern = get_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER)
         defense_tower_pattern = get_tower_pattern(UnitType.LEVEL_ONE_DEFENSE_TOWER)
 
-    block_width = int(math.sqrt(width)) 
-    block_height = int(math.sqrt(height))
-    i = 0
-    while i < width:
-        targets.append(MapLocation(0,i))
-        targets.append(MapLocation(height-1,i))
-        i += block_width
-    i = 0
-    while i < height:
-        targets.append(MapLocation(i,0))
-        targets.append(MapLocation(i,width-1))
-        i += block_height
+    # block_width = int(math.sqrt(width)) 
+    # block_height = int(math.sqrt(height))
+    # i = 0
+    # while i < width:
+    #     targets.append(MapLocation(0,i))
+    #     targets.append(MapLocation(height-1,i))
+    #     i += block_width
+    # i = 0
+    # while i < height:
+    #     targets.append(MapLocation(i,0))
+    #     targets.append(MapLocation(i,width-1))
+    #     i += block_height
     # if get_type() == UnitType.MOPPER and get_id() % 3 == 0:
     #     is_messenger = True
-
+    round_num = get_round_num()
     # Sets a part of soldiers as attackers
     if get_type() == UnitType.SOLDIER:
-        if get_round_num() <= 300: 
+        if round_num <= 300: 
             if get_id() % 4 == 0:
                 is_attackingsoldier = True
             else:
@@ -137,6 +140,13 @@ def turn():
                 is_attackingsoldier = False
             else:   
                 is_attackingsoldier = True
+        if round_num <= 150 or get_num_towers() <= 4:
+            is_SRP_builder = False
+        else:
+            if get_id() % 4 == 0:
+                is_SRP_builder = True
+            else:
+                is_SRP_builder = False
     if get_type() == UnitType.SPLASHER:
         if get_id() % 3 == 0:
             is_attackingsplasher = False
@@ -212,13 +222,13 @@ def run_tower():
     tower_count = get_num_towers()
     if height * width <= 800:
         soldier_ratio = 55
-        mopper_ratio = 65
+        mopper_ratio = 60
     elif height * width <= 1600:
         soldier_ratio = 60
-        mopper_ratio = 75
+        mopper_ratio = 67
     else:
         if cur_round <= 200:
-            soldier_ratio = 70
+            soldier_ratio = 80
             mopper_ratio = 100
         elif cur_round <= 500:
             soldier_ratio = 60
@@ -278,6 +288,7 @@ def upgrade_nearby_paint_towers():
             upgrade_tower(ally_loc)
         if ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER and can_upgrade_tower(ally_loc) and get_money() >= 8000:
             upgrade_tower(ally_loc)
+
 def refill_paint():
     # Global variables
     global is_refilling
@@ -335,7 +346,7 @@ def can_SRP():
         return False
     for tile in sense_nearby_map_infos(get_location(), 8):
         tile_robot = sense_robot_at_location(tile.get_map_location())
-        if tile.get_paint().is_enemy():
+        if tile.get_paint().is_enemy() or tile.get_mark() != PaintType.EMPTY:
             return False
         elif tile.get_paint() == PaintType.ALLY_SECONDARY and tile_robot is not None and tile_robot.get_team() == get_team() and tile_robot.get_type().is_robot_type():
             return False
@@ -440,15 +451,12 @@ def run_soldier():
     global turns_without_attack
     global painting_ruin_loc
     global tower_type
+    global SRP_positions
 
     cur_loc = get_location()
 
-    # if is_marking_SRP == False and can_SRP() == True:
-    #     is_marking_SRP = True
-
     # if is_marking_SRP:
-    #     SRP_mark()
-    #     return
+    #     if len(SRP_positions) > 0:
     
     if turn_count == 1 :
         move_count = 0
@@ -493,12 +501,11 @@ def run_soldier():
                 move(move_dir)
             return
         else:
-            if has_nearby_soldiers(cur_ruin.get_map_location()) == False:
-                is_painting_pattern = True
-                turns_without_attack = 0
-                painting_turns = 0
-                painting_ruin_loc = cur_ruin.get_map_location()
-                tower_type = build_tower_type(painting_ruin_loc)
+            is_painting_pattern = True
+            turns_without_attack = 0
+            painting_turns = 0
+            painting_ruin_loc = cur_ruin.get_map_location()
+            tower_type = build_tower_type(painting_ruin_loc)
             return
         
     if is_attackingsoldier and (turn_count == 1 or current_target is None):

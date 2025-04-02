@@ -351,6 +351,8 @@ def run_tower():
     global mid_game_start
     global end_game_start
     global directions
+    global soldier_ratio
+    global mopper_ratio
 
 
     if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 65 and check_nearby_opp_paint() == False and get_money() >= 2500 and get_num_towers() >= 3 and has_nearby_robots():
@@ -365,47 +367,68 @@ def run_tower():
             break
     if cur_round <= 3 and is_starting_tower:
         build_robot(UnitType.SOLDIER, next_loc)
-    else:
-        # if cur_round > 4:
-        #     nearby_enemy_robots = sense_nearby_robots(team = get_team().opponent())
-        #     cur_type = get_type()
-        #     if len(nearby_enemy_robots) > 0 and (cur_type == UnitType.LEVEL_ONE_PAINT_TOWER or cur_type == UnitType.LEVEL_TWO_PAINT_TOWER or cur_type == UnitType.LEVEL_THREE_PAINT_TOWER):
-        #         has_attacker = False
-        #         for robot in nearby_enemy_robots:
-        #             if robot.get_type() == UnitType.SOLDIER or robot.get_type() == UnitType.SPLASHER:
-        #                 has_attacker = True
-        #         if has_attacker and can_build_robot(UnitType.MOPPER, next_loc):
-        #             build_robot(UnitType.MOPPER, next_loc)
-
-        bot_type = spawn_type()
-        if get_chips() > bot_type.money_cost + 1000 and get_paint() > bot_type.paint_cost:
-            build_robot(bot_type, next_loc)
-            if bot_type == UnitType.SOLDIER:
-                spawned_soldiers += 1
-            elif bot_type == UnitType.SPLASHER:
-                spawned_splashers += 1
-            else:
-                spawned_moppers += 1
-
-    # if height * width <= 800:
-    #     soldier_ratio = 60
-    #     mopper_ratio = 63
-    # elif height * width <= 1600:
-    #     soldier_ratio = 65
-    #     mopper_ratio = 67
     # else:
-    #     if cur_round <= 200:
-    #         soldier_ratio = 90
-    #         mopper_ratio = 92
-    #     elif cur_round <= 400:
-    #         soldier_ratio = 55
-    #         mopper_ratio = 59
-    #     else:
-    #         soldier_ratio = 50
-    #         mopper_ratio = 55
-    # if cur_round >= 700 and get_num_towers() <= 4:
-    #     soldier_ratio = 50
-    #     mopper_ratio = 55 
+    #     # if cur_round > 4:
+    #     #     nearby_enemy_robots = sense_nearby_robots(team = get_team().opponent())
+    #     #     cur_type = get_type()
+    #     #     if len(nearby_enemy_robots) > 0 and (cur_type == UnitType.LEVEL_ONE_PAINT_TOWER or cur_type == UnitType.LEVEL_TWO_PAINT_TOWER or cur_type == UnitType.LEVEL_THREE_PAINT_TOWER):
+    #     #         has_attacker = False
+    #     #         for robot in nearby_enemy_robots:
+    #     #             if robot.get_type() == UnitType.SOLDIER or robot.get_type() == UnitType.SPLASHER:
+    #     #                 has_attacker = True
+    #     #         if has_attacker and can_build_robot(UnitType.MOPPER, next_loc):
+    #     #             build_robot(UnitType.MOPPER, next_loc)
+
+    #     bot_type = spawn_type()
+    #     if get_chips() > bot_type.money_cost + 1000 and get_paint() > bot_type.paint_cost:
+    #         build_robot(bot_type, next_loc)
+    #         if bot_type == UnitType.SOLDIER:
+    #             spawned_soldiers += 1
+    #         elif bot_type == UnitType.SPLASHER:
+    #             spawned_splashers += 1
+    #         else:
+    #             spawned_moppers += 1
+
+    if height * width <= 800:
+        soldier_ratio = 60
+        mopper_ratio = 63
+    elif height * width <= 1600:
+        soldier_ratio = 65
+        mopper_ratio = 67
+    else:
+        if cur_round <= 200:
+            soldier_ratio = 90
+            mopper_ratio = 92
+        elif cur_round <= 400:
+            soldier_ratio = 55
+            mopper_ratio = 59
+        else:
+            soldier_ratio = 50
+            mopper_ratio = 55
+    if cur_round >= 700 and get_num_towers() <= 4:
+        soldier_ratio = 50
+        mopper_ratio = 55 
+
+    random_number=random.randint(1,2500)
+    if random_number <= get_money():
+        # If we have no save turns remaining, start building robots
+        should_save = False
+
+        # Pick a direction to build in.
+        dir = directions[random.randint(0, len(directions) - 1)]
+        next_loc = get_location().add(dir)
+
+        # Pick a random robot type to build.
+        robot_type = random.randint(1, 100)
+        if robot_type <= soldier_ratio and can_build_robot(UnitType.SOLDIER, next_loc):
+            build_robot(UnitType.SOLDIER, next_loc)
+            log("BUILT A SOLDIER")
+        if robot_type > soldier_ratio and robot_type <= mopper_ratio and can_build_robot(UnitType.MOPPER, next_loc):
+            build_robot(UnitType.MOPPER, next_loc)
+            log("BUILT A MOPPER")
+        if robot_type <= 100 and robot_type > mopper_ratio and can_build_robot(UnitType.SPLASHER, next_loc):
+            build_robot(UnitType.SPLASHER, next_loc)
+            log("BUILT A SPLASHER") 
 
     # Read incoming messages
     messages = read_messages()

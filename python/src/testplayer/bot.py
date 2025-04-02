@@ -365,8 +365,13 @@ def run_tower():
         if sense_map_info(loc).is_passable():
             next_loc = loc
             break
-    if cur_round <= 3 and is_starting_tower:
+    if cur_round == 1 and is_starting_tower:
         build_robot(UnitType.SOLDIER, next_loc)
+    elif cur_round == 2 and is_starting_tower:
+        if get_type() == UnitType.LEVEL_ONE_MONEY_TOWER:
+            build_robot(UnitType.SPLASHER, next_loc)
+        else:
+            build_robot(UnitType.SOLDIER)
     # else:
     #     # if cur_round > 4:
     #     #     nearby_enemy_robots = sense_nearby_robots(team = get_team().opponent())
@@ -390,16 +395,16 @@ def run_tower():
     #             spawned_moppers += 1
 
     if height * width <= 800:
-        soldier_ratio = 60
-        mopper_ratio = 63
+        soldier_ratio = 50
+        mopper_ratio = 55
     elif height * width <= 1600:
         soldier_ratio = 65
         mopper_ratio = 67
     else:
-        if cur_round <= 200:
-            soldier_ratio = 90
-            mopper_ratio = 92
-        elif cur_round <= 400:
+        if cur_round <= 100:
+            soldier_ratio = 75
+            mopper_ratio = 77
+        elif cur_round <= 250:
             soldier_ratio = 55
             mopper_ratio = 59
         else:
@@ -422,12 +427,15 @@ def run_tower():
         robot_type = random.randint(1, 100)
         if robot_type <= soldier_ratio and can_build_robot(UnitType.SOLDIER, next_loc):
             build_robot(UnitType.SOLDIER, next_loc)
+            spawned_soldiers += 1
             log("BUILT A SOLDIER")
         if robot_type > soldier_ratio and robot_type <= mopper_ratio and can_build_robot(UnitType.MOPPER, next_loc):
             build_robot(UnitType.MOPPER, next_loc)
+            spawned_moppers += 1
             log("BUILT A MOPPER")
         if robot_type <= 100 and robot_type > mopper_ratio and can_build_robot(UnitType.SPLASHER, next_loc):
             build_robot(UnitType.SPLASHER, next_loc)
+            spawned_splashers += 1
             log("BUILT A SPLASHER") 
 
     # Read incoming messages
@@ -510,7 +518,7 @@ def refill_paint():
 
 def mark_patterns():
     for tile in sense_nearby_map_infos():
-        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) == None:
+        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) is None:
             tile_loc = tile.get_map_location()
             if can_complete_tower_pattern(UnitType.LEVEL_ONE_DEFENSE_TOWER, tile_loc):
                 complete_tower_pattern(UnitType.LEVEL_ONE_DEFENSE_TOWER, tile_loc)
@@ -681,6 +689,8 @@ def run_soldier():
 
     cur_loc = get_location()
 
+    mark_patterns()
+
     if is_SRP_builder:
         if is_marking_SRP:
             SRP_mark()
@@ -740,7 +750,7 @@ def run_soldier():
     # Search if there are any enemy towers
     cur_enemy_tower = None
     for tile in nearby_tiles:
-        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) == None:
+        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) is None:
             check_dist = tile.get_map_location().distance_squared_to(get_location())
             if check_dist < cur_dist:
                 cur_dist = check_dist
@@ -786,7 +796,7 @@ def run_soldier():
         #     tower_type = build_tower_type(painting_ruin_loc)
         #     return
         target_loc = cur_ruin.get_map_location()
-        if tower_type == None:
+        if tower_type is None:
             tower_type = build_tower_type(target_loc)
         dir = get_location().direction_to(target_loc)
         if can_move(dir):
@@ -903,7 +913,7 @@ def run_mopper():
             break
         tile_loc = tile.get_map_location()
         robot_tile = sense_robot_at_location(tile_loc)
-        if tile.has_ruin() and (robot_tile == None or (robot_tile.get_team() == get_team())):
+        if tile.has_ruin() and (robot_tile is None or (robot_tile.get_team() == get_team())):
             for ntile in sense_nearby_map_infos(tile_loc, 8):
                 if can_sense_location(ntile.get_map_location()) and ntile.get_paint().is_enemy():
                     current_target = ntile.get_map_location()

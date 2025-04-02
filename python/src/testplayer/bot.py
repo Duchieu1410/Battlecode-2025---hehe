@@ -157,11 +157,11 @@ def turn():
 
     # Sets a part of soldiers as attackers
     if get_type() == UnitType.SOLDIER:
-        if round_num <= 150: 
+        if round_num <= 200: 
             if get_id() % 4 == 0:
                 is_attackingsoldier = True
             else:
-                is_attackingsoldier = True
+                is_attackingsoldier = False
         else:
             if get_id() % 4 == 0:
                 is_attackingsoldier = True
@@ -175,7 +175,7 @@ def turn():
             else:
                 is_SRP_builder = True
     if get_type() == UnitType.SPLASHER:
-        if get_id() % 4 == 0:
+        if get_id() % 2 == 0:
             is_attackingsplasher = False
         else:
             is_attackingsplasher = True
@@ -668,6 +668,18 @@ def taint():
 #         flicker_tower_loc = tower_loc
 #         is_flickering_tower = True
 
+def has_nearby_enemy_paint(ruin_loc):
+    for tile in sense_nearby_map_infos(ruin_loc, 8):
+        if tile.get_paint().is_enemy():
+            has_mopper = False
+            for t in sense_nearby_robots(tile.get_map_location()):
+                if t.get_type() == UnitType.MOPPER:
+                    has_mopper = True
+                    break
+            if has_mopper == False:
+                return False
+    return True
+
 def run_soldier():
     if is_attackingsoldier:
         set_indicator_dot(get_location(), 255,0,0)
@@ -750,7 +762,7 @@ def run_soldier():
     # Search if there are any enemy towers
     cur_enemy_tower = None
     for tile in nearby_tiles:
-        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) is None:
+        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) is None and has_nearby_enemy_paint(tile.get_map_location()):
             check_dist = tile.get_map_location().distance_squared_to(get_location())
             if check_dist < cur_dist:
                 cur_dist = check_dist

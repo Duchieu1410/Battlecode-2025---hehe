@@ -104,7 +104,7 @@ is_starting_tower = False
 mid_game_start = 100
 end_game_start = 250
 
-money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
+money_tower_spawn = []
 
 early_game_spawn = []
 mid_game_spawn = []
@@ -145,6 +145,7 @@ def turn():
     global mid_game_spawn
     global end_game_spawn
     global current_tower_index
+    global money_tower_spawn
     turn_count += 1
 
     if get_round_num() == 1:
@@ -181,12 +182,14 @@ def turn():
         early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.SPLASHER]
         mid_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SPLASHER]
         end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
+        money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
         mid_game_start = 76
         end_game_start = 151
     elif height * width <= 2000:
         early_game_spawn = [UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER]
         mid_game_spawn = [UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER]
         end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
+        money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
         mid_game_start = 101
         end_game_start = 251
     else:
@@ -195,6 +198,12 @@ def turn():
         end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
         mid_game_start = 126
         end_game_start = 301 
+        if get_round_num() < 75:
+            money_tower_spawn = [UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER]
+        elif get_round_num() < 150:
+            money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
+        else: 
+            money_tower_spawn = [UnitType.SPLASHER, UnitType.SPLASHER]
 
     # Sets a part of soldiers as attackers
     if get_type() == UnitType.SOLDIER:
@@ -274,74 +283,6 @@ def has_nearby_robots():
             return True
     return False
 
-def spawn_type():
-    global height
-    global width
-    min_hw = height
-    if width < min_hw:
-        min_hw = width
-    cur_round = get_round_num()
-    cur_paint = get_paint()
-    if get_type() == UnitType.LEVEL_ONE_PAINT_TOWER:
-        if cur_round < mid_game_start:
-            if min_hw <= 30 and spawned_splashers == 0:
-                return UnitType.SPLASHER
-            else:
-                return UnitType.SOLDIER
-        elif cur_round < end_game_start:
-            soldier_count = spawned_soldiers / 3.0
-            splasher_count = spawned_splashers / 1.0
-            mopper_count = spawned_moppers / 2.0
-            if splasher_count <= soldier_count and splasher_count <= mopper_count and get_num_towers() < 6:
-                return UnitType.SPLASHER
-            else:
-                if mopper_count <= soldier_count - 0.5:
-                    return UnitType.MOPPER
-                if soldier_count <= mopper_count - 0.5:
-                    return UnitType.SOLDIER
-                if get_chips() >= 2000:
-                    return UnitType.MOPPER
-                else:
-                    return UnitType.SOLDIER
-        else:
-            soldier_count = spawned_soldiers / 1.0
-            splasher_count = spawned_splashers / 4.0
-            mopper_count = spawned_moppers / 2.0
-            if splasher_count <= soldier_count and splasher_count <= mopper_count:
-                return UnitType.SPLASHER
-            else:
-                if mopper_count <= soldier_count - 2:
-                    return UnitType.MOPPER
-                if soldier_count <= mopper_count - 2:
-                    return UnitType.SOLDIER
-                if get_chips() >= 2000:
-                    return UnitType.MOPPER
-                else:
-                    return UnitType.SOLDIER
-    else:
-        if cur_round < mid_game_start:
-            if min_hw <= 30 and spawned_splashers == 0 and cur_paint >= 300:
-                return UnitType.SPLASHER
-            else:
-                return UnitType.SOLDIER
-        elif cur_round < end_game_start:
-            if cur_paint < 200:
-                return UnitType.MOPPER
-            else:
-                if get_chips() > 1500 and cur_paint >= 300:
-                    return UnitType.SPLASHER
-                else:
-                    return UnitType.SOLDIER
-        else:
-            if cur_paint < 200:
-                return UnitType.MOPPER
-            elif cur_paint < 300:
-                return UnitType.SOLDIER
-            elif get_chips() > 1500 and get_round_num() % 10 != 0:
-                return UnitType.SPLASHER
-            else:
-                return UnitType.SOLDIER
-
 # def flicker():
 #     if get_chips() < 2500 or get_paint() >= 100: 
 #         return
@@ -400,7 +341,7 @@ def run_tower():
     global is_starting_tower
 
 
-    if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 65 and check_nearby_opp_paint() == False and get_money() >= 2500 and get_num_towers() >= 3 and has_nearby_robots():
+    if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 55 and check_nearby_opp_paint() == False and get_money() >= 2500 and get_num_towers() >= 3 and has_nearby_robots():
         disintegrate()
     # flicker()
     cur_round = get_round_num()
@@ -460,36 +401,34 @@ def run_tower():
     #     else:
     #         soldier_ratio = 50
     #         mopper_ratio = 55
+    # If we have no save turns remaining, start building robots
+    should_save = False
+    # Pick a random robot type to build.
+    robot_type = None
+    if get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type == UnitType.LEVEL_TWO_MONEY_TOWER:
+        robot_type = money_tower_spawn[current_tower_index]
+        if get_paint() < 200:
+            robot_type = UnitType.MOPPER
+    else:
+        if cur_round < mid_game_start:
+            robot_type = early_game_spawn[current_tower_index]
+        elif cur_round < end_game_start:
+            robot_type = mid_game_spawn[current_tower_index]
+        else:
+            robot_type = end_game_spawn[current_tower_index]
 
-    random_number=random.randint(1,2500)
-    if random_number <= get_money():
-        # If we have no save turns remaining, start building robots
-        should_save = False
-
-        # Pick a random robot type to build.
-        robot_type = None
+    if can_build_robot(robot_type, next_loc):
+        build_robot(robot_type, next_loc)
+        log("BUILT A DUDE")
         if get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type == UnitType.LEVEL_TWO_MONEY_TOWER:
-            robot_type = money_tower_spawn[current_tower_index]
+            current_tower_index = (current_tower_index + 1) % len(money_tower_spawn)
         else:
             if cur_round < mid_game_start:
-                robot_type = early_game_spawn[current_tower_index]
+                current_tower_index = (current_tower_index + 1) % len(early_game_spawn)
             elif cur_round < end_game_start:
-                robot_type = mid_game_spawn[current_tower_index]
+                current_tower_index = (current_tower_index + 1) % len(mid_game_spawn)
             else:
-                robot_type = end_game_spawn[current_tower_index]
-
-        if can_build_robot(robot_type, next_loc):
-            build_robot(robot_type, next_loc)
-            log("BUILT A DUDE")
-            if get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type == UnitType.LEVEL_TWO_MONEY_TOWER:
-                current_tower_index = (current_tower_index + 1) % len(money_tower_spawn)
-            else:
-                if cur_round < mid_game_start:
-                    current_tower_index = (current_tower_index + 1) % len(early_game_spawn)
-                elif cur_round < end_game_start:
-                    current_tower_index = (current_tower_index + 1) % len(mid_game_spawn)
-                else:
-                    current_tower_index = (current_tower_index + 1) % len(end_game_spawn)
+                current_tower_index = (current_tower_index + 1) % len(end_game_spawn)
 
 
         # if robot_type <= soldier_ratio and can_build_robot(UnitType.SOLDIER, next_loc):

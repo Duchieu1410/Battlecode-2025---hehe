@@ -703,10 +703,10 @@ def run_soldier():
     
     taint()
 
-    if is_painting_pattern:
-        run_paint_pattern()
-        painting_turns += 1
-        return
+    # if is_painting_pattern:
+    #     run_paint_pattern()
+    #     painting_turns += 1
+    #     return
 
     # Sense information about all visible nearby tiles.
     nearby_tiles = sense_nearby_map_infos()
@@ -750,47 +750,46 @@ def run_soldier():
                 move(away.rotate_right())
 
     if cur_ruin is not None:
-        if cur_dist > 1: 
-            set_indicator_dot(get_location(), 0,0,255)
-            move_dir = bug2(cur_ruin.get_map_location())
-            if move_dir is not None:
-                move(move_dir)
-            return
-        else:
-            # is_painting_pattern = True
-            # turns_without_attack = 0
-            # painting_turns = 0
-            # painting_ruin_loc = cur_ruin.get_map_location()
-            # tower_type = build_tower_type(painting_ruin_loc)
-            # return
-            target_loc = cur_ruin.get_map_location()
-            if tower_type == None:
-                tower_type = build_tower_type(target_loc)
-            dir = get_location().direction_to(target_loc)
-            if can_move(dir):
-                move(dir)
+        # if cur_dist > 4: 
+        #     move_dir = bug2(cur_ruin.get_map_location())
+        #     if move_dir is not None:
+        #         move(move_dir)
+        #     return
+        # else:
+        #     is_painting_pattern = True
+        #     turns_without_attack = 0
+        #     painting_turns = 0
+        #     painting_ruin_loc = cur_ruin.get_map_location()
+        #     tower_type = build_tower_type(painting_ruin_loc)
+        #     return
+        target_loc = cur_ruin.get_map_location()
+        if tower_type == None:
+            tower_type = build_tower_type(target_loc)
+        dir = get_location().direction_to(target_loc)
+        if can_move(dir):
+            move(dir)
 
-            # Mark the pattern we need to draw to build a tower here if we haven't already.
-            should_mark = cur_ruin.get_map_location().subtract(dir)
-            if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-                mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
-                log("Trying to build a tower at " + str(target_loc))
-            
-            # Fill in any spots in the pattern with the appropriate paint.
-            for pattern_tile in sense_nearby_map_infos(target_loc, 8):
-                if pattern_tile.get_mark() != pattern_tile.get_paint() and pattern_tile.get_mark() != PaintType.EMPTY:
-                    use_secondary = pattern_tile.get_mark() == PaintType.ALLY_SECONDARY
-                    if can_attack(pattern_tile.get_map_location()):
-                        attack(pattern_tile.get_map_location(), use_secondary)
+        # Mark the pattern we need to draw to build a tower here if we haven't already.
+        should_mark = cur_ruin.get_map_location().subtract(dir)
+        if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
+            mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+            log("Trying to build a tower at " + str(target_loc))
+        
+        # Fill in any spots in the pattern with the appropriate paint.
+        for pattern_tile in sense_nearby_map_infos(target_loc, 8):
+            if pattern_tile.get_mark() != pattern_tile.get_paint() and pattern_tile.get_mark() != PaintType.EMPTY:
+                use_secondary = pattern_tile.get_mark() == PaintType.ALLY_SECONDARY
+                if can_attack(pattern_tile.get_map_location()):
+                    attack(pattern_tile.get_map_location(), use_secondary)
 
-            # Complete the ruin if we can.
-            if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-                complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
-                set_timeline_marker("Tower built", 0, 255, 0)
-                log("Built a tower at " + str(target_loc) + "!")
+        # Complete the ruin if we can.
+        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
+            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
+            set_timeline_marker("Tower built", 0, 255, 0)
+            log("Built a tower at " + str(target_loc) + "!")
 
-            if sense_robot_at_location(target_loc):
-                tower_type = None
+        if sense_robot_at_location(target_loc):
+            tower_type = None
         
     if is_attackingsoldier and (turn_count == 1 or current_target is None):
         rand = random.randint(1,3)

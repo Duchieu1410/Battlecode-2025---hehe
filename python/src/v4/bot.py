@@ -400,7 +400,7 @@ def run_tower():
     global is_starting_tower
 
 
-    if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 65 and check_nearby_opp_paint() == False and get_money() >= 2500 and get_num_towers() >= 3 and has_nearby_robots():
+    if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 55 and check_nearby_opp_paint() == False and get_money() >= 2500 and has_nearby_robots():
         disintegrate()
     # flicker()
     cur_round = get_round_num()

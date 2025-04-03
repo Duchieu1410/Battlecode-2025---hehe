@@ -899,43 +899,14 @@ def run_mopper():
     global targets
     global tracing_turns
     global is_removing_enemy_paint
-
-    upgrade_nearby_paint_towers()
-    
-    if should_save and len(known_towers) > 0:
-        # Move to first known tower if we are saving
-        cur_tower = None
-        cur_dist = 9999999
-        for tower in known_towers:
-            check_dist = tower.get_map_location().distance_squared_to(get_location())
-            if check_dist < cur_dist:
-                cur_dist = check_dist
-                cur_tower = tower
-        dir = get_location().direction_to(cur_tower)
-        set_indicator_string(f"Returning to {known_towers[0]}")
-        if cur_tower != None:
-            next_dir = bug2(cur_tower)
-            move(next_dir)
-
-    # Finds ruins nearby and checks if it is buildable
-    nearby_tiles = sense_nearby_map_infos()
-    for tile in nearby_tiles:
-        if is_removing_enemy_paint:
-            break
-        tile_loc = tile.get_map_location()
-        robot_tile = sense_robot_at_location(tile_loc)
-        if tile.has_ruin() and (robot_tile is None or (robot_tile.get_team() == get_team())):
-            for ntile in sense_nearby_map_infos(tile_loc, 8):
-                if can_sense_location(ntile.get_map_location()) and ntile.get_paint().is_enemy():
-                    current_target = ntile.get_map_location()
-                    is_removing_enemy_paint = True
-                    break
-
-    update_friendly_towers()
-
-    mark_patterns()
+    global move_count
+    #upgrade_nearby_paint_towers()
 
     cur_loc = get_location()
+
+    #update_friendly_towers()
+
+    # TODO mop_swing op hehe
     enemy_robots= sense_nearby_robots(get_location(),5,team = get_team().opponent())
 
     count_west = 0
@@ -944,8 +915,9 @@ def run_mopper():
     count_south = 0
 
     for robot in enemy_robots:
-        loc = robot.get_location()  # Ensure get_location() returns an object or tuple
+        loc = robot.get_map_location()  
         robot_x, robot_y = loc.x, loc.y
+
         if robot_x > cur_loc.x:
             count_east += 1
         if robot_x < cur_loc.x:
@@ -958,53 +930,52 @@ def run_mopper():
 
     ma_count = max(count_east, max(count_north, max(count_south, count_west)))
 
-    if count_west == ma_count:
-        if can_mop_swing(directions.WEST):
+    if count_west == ma_count :
+        if can_mop_swing(directions.WEST) :
             mop_swing(directions.WEST)
-    elif count_north == ma_count:
-        if can_mop_swing(directions.NORTH):
+    elif count_north == ma_count :
+        if can_mop_swing(directions.NORTH) :
             mop_swing(directions.NORTH)
-    elif count_south == ma_count:
-        if can_mop_swing(directions.SOUTH):
+    elif count_south == ma_count :
+        if can_mop_swing(directions.SOUTH) :
             mop_swing(directions.SOUTH)
-    elif count_east == ma_count:
-        if can_mop_swing(directions.EAST):
+    elif count_east == ma_count :
+        if can_mop_swing(directions.EAST) :
             mop_swing(directions.EAST)
 
-    if is_removing_enemy_paint and (can_attack(current_target) or (can_sense_location(current_target) and sense_map_info(current_target).get_paint().is_ally())):
-        if can_attack(current_target):
-            attack(current_target)
-        current_target = None
-        is_removing_enemy_paint = False
+    is_move = False
+    # skibidi movement
+    range_atk = sense_nearby_map_infos(cur_loc,2)
+    for tile in range_atk :
+        if tile.get_paint().is_enemy() == True:
+            if can_attack(tile.get_map_location()) : 
+                attack(tile.get_map_location())
+        if tile.get_paint().is_enemy() == True:
+            is_move = True
+            log("skibidi dop dop yes yes")
 
-    enemy_robots = sense_nearby_robots(get_location(),2,team=get_team().opponent())    
-    for robot in enemy_robots:
-        robot_dir = get_location().direction_to(robot.get_location())
-        if can_mop_swing(robot_dir):
-            mop_swing(robot_dir)
+    if is_move == False:
+        if current_target is not None and current_target.distance_squared_to(cur_loc) <= 1 :
+            current_target = None 
 
-    if current_target is None or (is_removing_enemy_paint == False and get_location().distance_squared_to(current_target) <= 5):
-        log("Reached target, now changing to new target")
-        current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
-        tracing_turns = 0
+        map_infos= sense_nearby_map_infos(cur_loc, 20)
+        cur_dis = 10000000000000000000
+        for tile in map_infos :
+            if tile.get_paint().is_enemy() == True:
+                if tile.get_map_location().distance_squared_to(cur_loc) < cur_dis :
+                    current_target = tile.get_map_location()
+                    cur_dis = tile.get_map_location().distance_squared_to(cur_loc)
 
-    # Move and attack.
-    if is_searchmopper == False:
-        dir = directions[random.randint(0, len(directions) - 1)]
-        next_loc = get_location().add(dir)
-        if can_move(dir):
-            move(dir)
-        if can_attack(next_loc):
-            attack(next_loc)
-    elif current_target is not None:
+        
+        if current_target is None :
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+        
         search_dir = bug2(current_target)
-        if search_dir is not None:
-            next_loc = get_location().add(search_dir)
+        if can_move(search_dir):
             move(search_dir)
-
-    for tile in sense_nearby_map_infos(get_location(), 2):
-        if tile.get_paint().is_enemy() and can_attack(tile.get_map_location()):
-            attack(tile.get_map_location())
+        else:
+            log(f"Can't move in direction {search_dir}")
+            current_target = None
 
     if is_messenger:
         # Set a useful indicator at this mopper's location so we can see who is a messenger

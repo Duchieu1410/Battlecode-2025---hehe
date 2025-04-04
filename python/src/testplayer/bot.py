@@ -494,7 +494,7 @@ def upgrade_nearby_paint_towers():
         ally_loc = ally.location
         if ((ally.get_type() == UnitType.LEVEL_ONE_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_ONE_DEFENSE_TOWER) and get_money() >= 5000) and can_upgrade_tower(ally_loc):
             upgrade_tower(ally_loc)
-        if ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER and can_upgrade_tower(ally_loc) and get_money() >= 8000:
+        if (ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_TWO_DEFENSE_TOWER) and can_upgrade_tower(ally_loc) and get_money() >= 8000:
             upgrade_tower(ally_loc)
 
 def refill_paint():
@@ -503,7 +503,7 @@ def refill_paint():
     global paint_capacity
 
     # Resets refilling to 0
-    if not len(known_paint_towers) > 0:
+    if len(known_paint_towers) == 0:
         is_refilling = False
         return
     
@@ -583,6 +583,18 @@ def SRP_mark():
         is_marking_SRP = False
         has_marked_SRP = False
 
+def has_nearby_enemy_paint(ruin_loc):
+    for tile in sense_nearby_map_infos(ruin_loc, 8):
+        if tile.get_paint().is_enemy():
+            has_mopper = False
+            for t in sense_nearby_robots(tile.get_map_location()):
+                if t.get_type() == UnitType.MOPPER:
+                    has_mopper = True
+                    break
+            if has_mopper == False:
+                return False
+    return True
+
 def isWithinPattern(cur_loc, ruin_loc):
     return abs(cur_loc.x - ruin_loc.x) <= 2 and abs(cur_loc.y - ruin_loc.y) <= 2 and ruin_loc != cur_loc
 
@@ -607,21 +619,65 @@ def run_paint_pattern():
     global painting_ruin_loc
     global tower_type
     global is_painting_pattern
-    global has_marked_tower
-    if has_marked_tower == False and can_mark_tower_pattern(tower_type, painting_ruin_loc):
-        mark_tower_pattern(tower_type, painting_ruin_loc)
-        has_marked_tower = True
-    if painting_turns % 2 == 0:
-        to_ruin = get_location().direction_to(painting_ruin_loc)
-        tangent = to_ruin.rotate_right().rotate_right()
-        dist = get_location().distance_squared_to(painting_ruin_loc)
-        
-        if dist > 4:
-            tangent = tangent.rotate_left()
-        if can_move(tangent):
-            move(tangent)
+
+    cur_dist = get_location().distance_squared_to(painting_ruin_loc)
+    dir = get_location().direction_to(painting_ruin_loc)
+    if cur_dist > 2:
+        if can_move(dir):
+            move(dir)
+    elif cur_dist == 2:
+        left_dir = dir.rotate_left()
+        right_dir = dir.rotate_right()
+        if can_move(left_dir):
+            move(left_dir)
+        elif can_move(right_dir):
+            move(right_dir)
+    else:
+        right_dir = dir.rotate_right()
+        if can_move(right_dir):
+            move(right_dir)
+    # if has_nearby_enemy_paint(painting_ruin_loc):
+    #     is_painting_pattern = False
+    #     return
+
+    # tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
+    mark_loc_down = MapLocation(painting_ruin_loc.x, painting_ruin_loc.y-1)
+    mark_loc_up = MapLocation(painting_ruin_loc.x, painting_ruin_loc.y+1)
+    tower_mark_down = sense_map_info(mark_loc_down).get_mark()
+    tower_mark_up = sense_map_info(mark_loc_up).get_mark()
+
+    if tower_mark_down == PaintType.EMPTY and tower_mark_up == PaintType.EMPTY:
+        # Move to optimal marking position if needed
+        # optimal_pos = MapLocation(painting_ruin_loc.x-1, painting_ruin_loc.y)
+        # if get_location().distance_squared_to(optimal_pos) > 0:
+        #     dir = bug2(optimal_pos)
+        #     if dir is not None:
+        #         move(dir)
+        #         return  # Wait until next turn to mark
+        build_type = build_tower_type(painting_ruin_loc)
+        if build_type == UnitType.LEVEL_ONE_MONEY_TOWER or build_type == UnitType.LEVEL_ONE_PAINT_TOWER:
+            if can_mark(mark_loc_down) == False:
+                return
+            if build_type == UnitType.LEVEL_ONE_MONEY_TOWER:
+                mark(mark_loc_down, True)
+            else:
+                mark(mark_loc_down, False)
+        else:
+            if can_mark(mark_loc_up) == False:
+                return
+            mark(mark_loc_up, True)
+
+    tower_type = None
+
+    if tower_mark_down == PaintType.ALLY_PRIMARY:
+        tower_type = UnitType.LEVEL_ONE_PAINT_TOWER
+    elif tower_mark_down == PaintType.ALLY_SECONDARY:
+        tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
+    else:
+        tower_type = UnitType.LEVEL_ONE_DEFENSE_TOWER
+
     if is_action_ready():
-        infos = sense_nearby_map_infos(radius_squared=3)
+        infos = sense_nearby_map_infos(radius_squared=9)
         attacked = False
         for info in infos:
             info_paint = info.get_paint()
@@ -638,7 +694,6 @@ def run_paint_pattern():
     if (can_complete_tower_pattern(tower_type, painting_ruin_loc)):
         complete_tower_pattern(tower_type, painting_ruin_loc)
         is_painting_pattern = False
-        has_marked_tower = False
 
     if turns_without_attack > 3:
         is_painting_pattern = False
@@ -689,18 +744,6 @@ def taint():
 #         flicker_tower_loc = tower_loc
 #         is_flickering_tower = True
 
-def has_nearby_enemy_paint(ruin_loc):
-    for tile in sense_nearby_map_infos(ruin_loc, 8):
-        if tile.get_paint().is_enemy():
-            has_mopper = False
-            for t in sense_nearby_robots(tile.get_map_location()):
-                if t.get_type() == UnitType.MOPPER:
-                    has_mopper = True
-                    break
-            if has_mopper == False:
-                return False
-    return True
-
 def run_soldier():
     # Global variables
     global is_refilling
@@ -730,10 +773,6 @@ def run_soldier():
             attacking_turns = 0
         else:
             attacking_turns += 1
-    else:
-        if non_attacking_turns >= 40 and get_id() % 4 == 0:
-            is_attackingsoldier = True
-            non_attacking_turns = 0
 
     cur_loc = get_location()
 
@@ -794,10 +833,10 @@ def run_soldier():
     
     taint()
 
-    # if is_painting_pattern:
-    #     run_paint_pattern()
-    #     painting_turns += 1
-    #     return
+    if is_painting_pattern:
+        run_paint_pattern()
+        painting_turns += 1
+        return
 
     # Sense information about all visible nearby tiles.
     nearby_tiles = sense_nearby_map_infos()
@@ -819,77 +858,63 @@ def run_soldier():
                 cur_enemy_tower = tile.get_map_location()
 
     if cur_ruin is not None:
-        # if cur_dist > 4: 
-        #     move_dir = bug2(cur_ruin.get_map_location())
-        #     if move_dir is not None:
-        #         move(move_dir)
-        #     return
-        # else:
-        #     is_painting_pattern = True
-        #     turns_without_attack = 0
-        #     painting_turns = 0
-        #     painting_ruin_loc = cur_ruin.get_map_location()
-        #     tower_type = build_tower_type(painting_ruin_loc)
-        #     return
-        target_loc = cur_ruin.get_map_location()
-
         if cur_dist > 4: 
-            move_dir = bug2(target_loc)
+            move_dir = bug2(cur_ruin.get_map_location())
             if move_dir is not None:
                 move(move_dir)
             return
-        
-        dir = get_location().direction_to(target_loc)
-        if can_move(dir):
-            move(dir)
-
-        mark_loc_down = MapLocation(target_loc.x, target_loc.y-1)
-        mark_loc_up = MapLocation(target_loc.x, target_loc.y+1)
-        tower_mark_down = sense_map_info(mark_loc_down).get_mark()
-        tower_mark_up = sense_map_info(mark_loc_up).get_mark()
-
-        if tower_mark_down == PaintType.EMPTY and tower_mark_up == PaintType.EMPTY:
-            # Move to optimal marking position if needed
-            optimal_pos = MapLocation(target_loc.x-1, target_loc.y)
-            if get_location().distance_squared_to(optimal_pos) > 0:
-                dir = bug2(optimal_pos)
-                if dir is not None:
-                    move(dir)
-                    return  # Wait until next turn to mark
-            build_type = build_tower_type(target_loc)
-            if build_type == UnitType.LEVEL_ONE_MONEY_TOWER or build_type == UnitType.LEVEL_ONE_PAINT_TOWER:
-                if build_type == UnitType.LEVEL_ONE_MONEY_TOWER:
-                    mark(mark_loc_down, True)
-                else:
-                    mark(mark_loc_down, False)
-            else:
-                mark(mark_loc_up, True)
-
-        tower_type = None
-
-        if tower_mark_down == PaintType.ALLY_PRIMARY:
-            tower_type = UnitType.LEVEL_ONE_PAINT_TOWER
-        elif tower_mark_down == PaintType.ALLY_SECONDARY:
-            tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
         else:
-            tower_type = UnitType.LEVEL_ONE_DEFENSE_TOWER
+            is_painting_pattern = True
+            turns_without_attack = 0
+            painting_turns = 0
+            painting_ruin_loc = cur_ruin.get_map_location()
+            return
+
+        # target_loc = cur_ruin.get_map_location()
+        
+        # dir = get_location().direction_to(target_loc)
+        # if can_move(dir):
+        #     move(dir)
+
+        # mark_loc_down = MapLocation(target_loc.x, target_loc.y-1)
+        # mark_loc_up = MapLocation(target_loc.x, target_loc.y+1)
+        # tower_mark_down = sense_map_info(mark_loc_down).get_mark()
+        # tower_mark_up = sense_map_info(mark_loc_up).get_mark()
+
+        # if tower_mark_down == PaintType.EMPTY and tower_mark_up == PaintType.EMPTY:
+        #     build_type = build_tower_type(target_loc)
+        #     if build_type == UnitType.LEVEL_ONE_MONEY_TOWER:
+        #         mark(mark_loc_down, True)
+        #     elif build_type == UnitType.LEVEL_ONE_PAINT_TOWER:
+        #         mark(mark_loc_down, False)
+        #     else:
+        #         mark(mark_loc_up, True)
+
+        # tower_type = None
+
+        # if tower_mark_down == PaintType.ALLY_PRIMARY:
+        #     tower_type = UnitType.LEVEL_ONE_PAINT_TOWER
+        # elif tower_mark_down == PaintType.ALLY_SECONDARY:
+        #     tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
+        # else:
+        #     tower_type = UnitType.LEVEL_ONE_DEFENSE_TOWER
 
         # Fill in any spots in the pattern with the appropriate paint.
-        for pattern_tile in sense_nearby_map_infos(target_loc, 8):
-            if isWithinPattern(pattern_tile.get_map_location(), target_loc) == False:
-                continue
-            use_secondary = get_is_secondary(target_loc, pattern_tile.get_map_location(), tower_type)
-            if pattern_tile.get_paint() == PaintType.EMPTY or pattern_tile.get_paint().is_secondary() != use_secondary:
-                if can_attack(pattern_tile.get_map_location()):
-                    attack(pattern_tile.get_map_location(), use_secondary)
+        # for pattern_tile in sense_nearby_map_infos(target_loc, 8):
+        #     if isWithinPattern(pattern_tile.get_map_location(), target_loc) == False:
+        #         continue
+        #     use_secondary = get_is_secondary(target_loc, pattern_tile.get_map_location(), tower_type)
+        #     if pattern_tile.get_paint() == PaintType.EMPTY or pattern_tile.get_paint().is_secondary() != use_secondary:
+        #         if can_attack(pattern_tile.get_map_location()):
+        #             attack(pattern_tile.get_map_location(), use_secondary)
 
-        if can_complete_tower_pattern(tower_type, target_loc):
-            complete_tower_pattern(tower_type, target_loc)
-            set_timeline_marker("Tower built", 0, 255, 0)
-            log("Built a tower at " + str(target_loc) + "!")
+        # if can_complete_tower_pattern(tower_type, target_loc):
+        #     complete_tower_pattern(tower_type, target_loc)
+        #     set_timeline_marker("Tower built", 0, 255, 0)
+        #     log("Built a tower at " + str(target_loc) + "!")
 
-        if sense_robot_at_location(target_loc):
-            tower_type = None
+        # if sense_robot_at_location(target_loc):
+        #     tower_type = None
 
     mark_patterns()
 

@@ -282,7 +282,7 @@ def build_tower_type(loc):
         sq_height = int(math.sqrt(35)) / 2
         if loc.x >= mid_width - sq_width and loc.x <= mid_width + sq_width and loc.y >= mid_height - sq_height and loc.y <= mid_height + sq_height and tower_count >= 6:
             return UnitType.LEVEL_ONE_DEFENSE_TOWER
-        if tower_count >= 8 and tower_count % 8 == 0:
+        if tower_count >= 8 and tower_count % 3 == 0:
             return UnitType.LEVEL_ONE_PAINT_TOWER
         else:
             return UnitType.LEVEL_ONE_MONEY_TOWER
@@ -727,24 +727,6 @@ def taint():
                     attack(attack_loc)
                     tainted_ruins.append(ruin)
 
-def has_nearby_robots_painting_ruin(ruin_loc):
-    ally_robot_count = 0
-
-    pos_a = sense_robot_at_location(MapLocation(ruin_loc.x-1, ruin_loc.y))
-    pos_b = sense_robot_at_location(MapLocation(ruin_loc.x-1, ruin_loc.y))
-    pos_c = sense_robot_at_location(MapLocation(ruin_loc.x-1, ruin_loc.y))
-    pos_d = sense_robot_at_location(MapLocation(ruin_loc.x-1, ruin_loc.y))
-    ally_team = get_team()
-    if pos_a is not None and pos_a.get_team() == ally_team:
-        ally_robot_count += 1
-    if pos_b is not None and pos_b.get_team() == ally_team:
-        ally_robot_count += 1
-    if pos_c is not None and pos_c.get_team() == ally_team:
-        ally_robot_count += 1
-    if pos_d is not None and pos_d.get_team() == ally_team:
-        ally_robot_count += 1
-    return ally_robot_count < 2
-
 # def input_messages():
 #     global flicker_tower_loc
 #     global is_flickering_tower
@@ -865,7 +847,7 @@ def run_soldier():
     # Search if there are any enemy towers
     cur_enemy_tower = None
     for tile in nearby_tiles:
-        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) is None and has_nearby_enemy_paint(tile.get_map_location()) and has_nearby_robots_painting_ruin(tile.get_map_location()):
+        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) is None and has_nearby_enemy_paint(tile.get_map_location()):
             check_dist = tile.get_map_location().distance_squared_to(get_location())
             if check_dist < cur_dist:
                 cur_dist = check_dist

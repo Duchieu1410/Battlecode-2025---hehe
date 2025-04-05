@@ -75,7 +75,7 @@ painting_ruin_loc = None
 tower_type = None
 is_SRP_builder = False
 next_SRP_loc = None
-visited_SRP_locs = []
+visited_locs = []
 has_marked_tower = False
 
 paint_tower_pattern = None
@@ -188,7 +188,7 @@ def turn():
     cur_round = get_round_num()
 
     # Tower spawn threshold
-    if min(height, width) <= 30 or height * width <= 900:
+    if height * width <= 900:
         early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER]
         mid_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
         end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
@@ -665,10 +665,7 @@ def run_paint_pattern():
         disintegrate()
 
     dir = get_location().direction_to(painting_ruin_loc)
-    if cur_dist > 2:
-        if can_move(dir):
-            move(dir)
-    elif cur_dist == 2:
+    if cur_dist == 4:
         left_dir = dir.rotate_left()
         right_dir = dir.rotate_right()
         if can_move(left_dir):
@@ -715,29 +712,20 @@ def run_paint_pattern():
     #     tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
     # else:
     #     tower_type = UnitType.LEVEL_ONE_DEFENSE_TOWER
-
-    if is_action_ready():
-        infos = sense_nearby_map_infos(radius_squared=9)
-        attacked = False
-        for info in infos:
-            info_paint = info.get_paint()
-            loc = info.get_map_location()
-            isSecondary = get_is_secondary(painting_ruin_loc, loc, tower_type)
-            if can_attack(loc) and (info_paint == PaintType.EMPTY or info_paint.is_secondary() != isSecondary) and isWithinPattern(loc, painting_ruin_loc):
-                attack(loc, isSecondary)
-                attacked = True
-                turns_without_attack = 0
-                break
-        if attacked == False:
-            turns_without_attack += 1
+    infos = sense_nearby_map_infos(radius_squared=9)
+    for info in infos:
+        info_paint = info.get_paint()
+        loc = info.get_map_location()
+        isSecondary = get_is_secondary(painting_ruin_loc, loc, tower_type)
+        if can_attack(loc) and (info_paint == PaintType.EMPTY or info_paint.is_secondary() != isSecondary) and isWithinPattern(loc, painting_ruin_loc):
+            attack(loc, isSecondary)
+            break
     
     if (can_complete_tower_pattern(tower_type, painting_ruin_loc)):
         complete_tower_pattern(tower_type, painting_ruin_loc)
+    if sense_robot_at_location(painting_ruin_loc) is not None:
         is_painting_pattern = False
         is_flickering_tower = False
-
-    if turns_without_attack > 3:
-        is_painting_pattern = False
 
 def taint():
     cur_loc = get_location()
@@ -840,9 +828,31 @@ def run_soldier():
     taint()
 
     if is_painting_pattern:
+        set_indicator_dot(cur_loc, 0,0,255)
         run_paint_pattern()
         painting_turns += 1
         return
+
+    input_messages()
+
+    if is_flickering_tower:
+        if flicker_tower_loc is None:
+            is_flickering_tower = False
+            return
+        cur_dist = cur_loc.distance_squared_to(flicker_tower_loc)
+        if cur_dist > 4:
+            move_dir = bug2(flicker_tower_loc)
+            if move_dir is not None and can_move(move_dir):
+                move(move_dir)
+            return
+        if sense_robot_at_location(flicker_tower_loc) is not None:
+            is_flickering_tower = False
+            return
+        else:
+            is_painting_pattern = True
+            turns_without_attack = 0
+            painting_turns = 0
+            painting_ruin_loc = flicker_tower_loc
 
     if get_paint() <= 20:
         is_refilling = True
@@ -869,27 +879,6 @@ def run_soldier():
         move_count = 0
 
     upgrade_nearby_paint_towers()
-
-    input_messages()
-
-    if is_flickering_tower:
-        if flicker_tower_loc is None:
-            is_flickering_tower = False
-            return
-        cur_dist = cur_loc.distance_squared_to(flicker_tower_loc)
-        if cur_dist > 4:
-            move_dir = bug2(flicker_tower_loc)
-            if move_dir is not None and can_move(move_dir):
-                move(move_dir)
-            return
-        if sense_robot_at_location(flicker_tower_loc) is not None:
-            is_flickering_tower = False
-            return
-        else:
-            is_painting_pattern = True
-            turns_without_attack = 0
-            painting_turns = 0
-            painting_ruin_loc = flicker_tower_loc
 
     #Checks if refilling is needed
 
@@ -919,14 +908,14 @@ def run_soldier():
             move_dir = bug2(cur_ruin.get_map_location())
             if move_dir is not None and can_move(move_dir):
                 move(move_dir)
-            return
-        else:
+        cur_dist = get_location().distance_squared_to(cur_ruin.get_map_location())
+        if cur_dist <= 4:
             is_painting_pattern = True
             turns_without_attack = 0
             painting_turns = 0
             painting_ruin_loc = cur_ruin.get_map_location()
             return
-
+        return
         # target_loc = cur_ruin.get_map_location()
         
         # dir = get_location().direction_to(target_loc)

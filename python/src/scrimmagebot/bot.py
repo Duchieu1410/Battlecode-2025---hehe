@@ -32,6 +32,7 @@ directions = [
 # Variables for communication
 known_towers = []
 known_money_towers = []
+known_paint_towers = []
 is_messenger = False
 should_save = False
 save_turns = 0
@@ -56,6 +57,9 @@ width = get_map_width()
 is_refilling = False
 paint_capacity = 0
 
+attacking_turns = 0
+non_attacking_turns = 0
+
 # Soldier Variables
 is_searchsoldier = True
 is_attackingsoldier = False
@@ -70,12 +74,14 @@ turns_without_attack = 0
 painting_ruin_loc = None
 tower_type = None
 is_SRP_builder = False
-SRP_positions = []
+next_SRP_loc = None
+visited_locs = []
 has_marked_tower = False
 
 paint_tower_pattern = None
 money_tower_pattern = None
 defense_tower_pattern = None
+SRP_pattern = None
 
 tainted_ruins = []
 
@@ -104,6 +110,19 @@ is_starting_tower = False
 mid_game_start = 100
 end_game_start = 250
 
+money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
+
+early_game_spawn = []
+mid_game_spawn = []
+end_game_spawn = []
+
+current_tower_index = 0
+
+def min(a, b):
+    if a < b:
+        return a
+    return b
+
 def turn():
     """
     MUST be defined for robot to run
@@ -128,12 +147,22 @@ def turn():
     global spawned_soldiers
     global mid_game_start
     global end_game_start
+    global early_game_spawn
+    global mid_game_spawn
+    global end_game_spawn
+    global current_tower_index
+    global money_tower_spawn
+    global SRP_pattern
     turn_count += 1
 
-    if turn_count == 1:
+    if get_round_num() == 1:
+        is_starting_tower = True
+
+    if turn_count <= 3:
         paint_tower_pattern = get_tower_pattern(UnitType.LEVEL_ONE_PAINT_TOWER)
         money_tower_pattern = get_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER)
         defense_tower_pattern = get_tower_pattern(UnitType.LEVEL_ONE_DEFENSE_TOWER)
+        SRP_pattern = get_resource_pattern()
 
     # block_width = int(math.sqrt(width)) 
     # block_height = int(math.sqrt(height))
@@ -154,6 +183,47 @@ def turn():
         spawned_moppers = 0
         spawned_splashers = 0
         spawned_soldiers = 0
+        current_tower_index = 0
+
+    cur_round = get_round_num()
+
+    # Tower spawn threshold
+    if height * width <= 900:
+        early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER]
+        mid_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
+        end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
+        mid_game_start = 81
+        end_game_start = 156
+        if cur_round < mid_game_start:
+            money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
+        elif cur_round < end_game_start:
+            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
+        else:
+            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
+    elif height * width <= 2000:
+        early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
+        mid_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER]
+        end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER]
+        mid_game_start = 106
+        end_game_start = 256
+        if cur_round < mid_game_start:
+            money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
+        elif cur_round < end_game_start:
+            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
+        else:
+            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
+    else:
+        early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
+        mid_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER]
+        end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER]
+        mid_game_start = 151
+        end_game_start = 271 
+        if cur_round < 75:
+            money_tower_spawn = [UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER]
+        elif cur_round < end_game_start:
+            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
+        else:
+            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
 
     # Sets a part of soldiers as attackers
     if get_type() == UnitType.SOLDIER:
@@ -167,18 +237,13 @@ def turn():
                 is_attackingsoldier = True
             else:   
                 is_attackingsoldier = True
-        if round_num <= 100:
+        if round_num <= 50:
             is_SRP_builder = False
         else:
-            if get_id() % 3 == 0:
-                is_SRP_builder = False
-            else:
+            if get_id() % 2 == 0:
                 is_SRP_builder = True
-    if get_type() == UnitType.SPLASHER:
-        if get_id() % 2 == 0:
-            is_attackingsplasher = False
-        else:
-            is_attackingsplasher = True
+            else:
+                is_SRP_builder = False
     if current_target is not None and current_target == MapLocation(100000, 100000):
         current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
         tracing_turns = 0
@@ -193,8 +258,6 @@ def turn():
         paint_capacity = 300
         run_splasher()
     elif get_type().is_tower_type():
-        if get_round_num():
-            is_starting_tower = True
         run_tower()
     else:
         pass  # Other robot types?
@@ -206,6 +269,7 @@ def check_nearby_opp_paint():
     return False
 
 def build_tower_type(loc):
+    return UnitType.LEVEL_ONE_MONEY_TOWER
     global height
     global width
     tower_count = get_num_towers()
@@ -223,121 +287,45 @@ def build_tower_type(loc):
         sq_height = int(math.sqrt(35)) / 2
         if loc.x >= mid_width - sq_width and loc.x <= mid_width + sq_width and loc.y >= mid_height - sq_height and loc.y <= mid_height + sq_height and tower_count >= 6:
             return UnitType.LEVEL_ONE_DEFENSE_TOWER
-        return UnitType.LEVEL_ONE_MONEY_TOWER
+        if tower_count >= 8 and tower_count % 8 == 0:
+            return UnitType.LEVEL_ONE_PAINT_TOWER
+        else:
+            return UnitType.LEVEL_ONE_MONEY_TOWER
+
+def check_pattern():
+    cur_loc = get_location()
+    incorrect_paint = 0
+    for tile in sense_nearby_map_infos(radius_squared=8):
+        tile_loc = tile.get_map_location()
+        if isWithinPattern(tile_loc, cur_loc) == False:
+            continue
+        paint = tile.get_paint()
+        if paint.is_enemy():
+            return 999
+        if paint == PaintType.EMPTY or paint.is_secondary() != get_is_secondary(cur_loc, tile_loc, UnitType.LEVEL_ONE_MONEY_TOWER):
+            incorrect_paint += 1
+    return incorrect_paint
 
 def has_nearby_robots():
-    for tile in sense_nearby_map_infos():
-        tile_loc = tile.get_map_location()
-        if can_sense_location(tile_loc) == False:
-            continue
-        tile_robot = sense_robot_at_location(tile_loc)
-        if tile_robot is not None and tile_robot.get_team() == get_team() and not tile_robot.get_type().is_tower_type():
-            return True
-    return False
+    incorrect_paint = check_pattern()
+    nearby_allies = sense_nearby_robots(team=get_team())
+    min_dist = 9999
+    closest_ally = None
+    for ally in nearby_allies:
+        ally_type = ally.get_type()
+        ally_loc = ally.get_location()
+        if (ally_type == UnitType.SOLDIER or (incorrect_paint == 0 and (ally_type == UnitType.SPLASHER or ally_type == UnitType.MOPPER))) and can_send_message(ally_loc) and ally.get_paint_amount() > incorrect_paint * 5 + 10:
+            dist = get_location().distance_squared_to(ally_loc)
+            if dist <= min_dist:
+                min_dist = dist
+                closest_ally = ally
+    return closest_ally
 
-def spawn_type():
-    global height
-    global width
-    min_hw = height
-    if width < min_hw:
-        min_hw = width
-    cur_round = get_round_num()
-    cur_paint = get_paint()
-    if get_type() == UnitType.LEVEL_ONE_PAINT_TOWER:
-        if cur_round < mid_game_start:
-            if min_hw <= 30 and spawned_splashers == 0:
-                return UnitType.SPLASHER
-            else:
-                return UnitType.SOLDIER
-        elif cur_round < end_game_start:
-            soldier_count = spawned_soldiers / 3.0
-            splasher_count = spawned_splashers / 1.0
-            mopper_count = spawned_moppers / 2.0
-            if splasher_count <= soldier_count and splasher_count <= mopper_count and get_num_towers() < 6:
-                return UnitType.SPLASHER
-            else:
-                if mopper_count <= soldier_count - 0.5:
-                    return UnitType.MOPPER
-                if soldier_count <= mopper_count - 0.5:
-                    return UnitType.SOLDIER
-                if get_chips() >= 2000:
-                    return UnitType.MOPPER
-                else:
-                    return UnitType.SOLDIER
-        else:
-            soldier_count = spawned_soldiers / 1.0
-            splasher_count = spawned_splashers / 4.0
-            mopper_count = spawned_moppers / 2.0
-            if splasher_count <= soldier_count and splasher_count <= mopper_count:
-                return UnitType.SPLASHER
-            else:
-                if mopper_count <= soldier_count - 2:
-                    return UnitType.MOPPER
-                if soldier_count <= mopper_count - 2:
-                    return UnitType.SOLDIER
-                if get_chips() >= 2000:
-                    return UnitType.MOPPER
-                else:
-                    return UnitType.SOLDIER
-    else:
-        if cur_round < mid_game_start:
-            if min_hw <= 30 and spawned_splashers == 0 and cur_paint >= 300:
-                return UnitType.SPLASHER
-            else:
-                return UnitType.SOLDIER
-        elif cur_round < end_game_start:
-            if cur_paint < 200:
-                return UnitType.MOPPER
-            else:
-                if get_chips() > 1500 and cur_paint >= 300:
-                    return UnitType.SPLASHER
-                else:
-                    return UnitType.SOLDIER
-        else:
-            if cur_paint < 200:
-                return UnitType.MOPPER
-            elif cur_paint < 300:
-                return UnitType.SOLDIER
-            elif get_chips() > 1500 and get_round_num() % 10 != 0:
-                return UnitType.SPLASHER
-            else:
-                return UnitType.SOLDIER
-
-# def flicker():
-#     if get_chips() < 2500 or get_paint() >= 100: 
-#         return
-#     if get_type() == UnitType.LEVEL_ONE_MONEY_TOWER:
-#         nearby_tiles = sense_nearby_map_infos(get_location(), 8)
-#         incorrect_paint = 0
-#         for tile in nearby_tiles:
-#             if tile.get_map_location() == get_location():
-#                 continue
-#             if tile.get_paint().is_enemy():
-#                 return
-#             if tile.get_paint() == PaintType.EMPTY or tile.get_paint() != tile.get_mark():
-#                 incorrect_paint += 1
-#         if incorrect_paint < 3 or get_chips() > 5000:
-#             log("I need to flicker dumbass")
-#             nearby_allies = sense_nearby_robots(team=get_team())
-#             min_dist = 9999
-#             closest_ally = None
-#             for ally in nearby_allies:
-#                 if ally.get_type() == UnitType.SOLDIER and can_send_message(ally.get_location()) and ally.get_paint_amount() > incorrect_paint * 5 + 10:
-#                     dist = get_location().distance_squared_to(ally.get_location())
-#                     if dist <= min_dist:
-#                         min_dist = dist
-#                         closest_ally = ally
-#             if closest_ally is not None:
-#                 nearby_enemies = sense_nearby_robots(team = get_team().opponent())
-#                 for enemy in nearby_enemies:
-#                     if enemy.get_type() == UnitType.MOPPER or enemy.get_type == UnitType.SPLASHER:
-#                         return
-#                 message = encode_flicker(get_location())
-#                 if can_send_message(closest_ally.get_location(), message):
-#                     log("Sending flicker message to abcxyz")
-#                     send_message(closest_ally.get_location(), message)
-#                 if closest_ally.get_location().distance_squared_to(get_location()) <= 2 and incorrect_paint == 0:
-#                     disintegrate()
+def flicker(closest_ally):
+    message = encode_flicker(get_location())
+    log("Sending flicker message to abcxyz")
+    send_message(closest_ally.get_location(), message)
+    disintegrate()
 
 def run_tower():
     # Global variables
@@ -353,25 +341,40 @@ def run_tower():
     global directions
     global soldier_ratio
     global mopper_ratio
+    global early_game_spawn
+    global mid_game_spawn
+    global end_game_spawn
+    global current_tower_index
+    global money_tower_spawn
+    global is_starting_tower
 
+    cur_type = get_type()
 
-    if (get_type() == UnitType.LEVEL_ONE_MONEY_TOWER or get_type() == UnitType.LEVEL_TWO_MONEY_TOWER) and turn_count >= 65 and check_nearby_opp_paint() == False and get_money() >= 2500 and get_num_towers() >= 3 and has_nearby_robots():
-        disintegrate()
-    # flicker()
+    if (cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER) and check_pattern() <= 25 and len(sense_nearby_robots(team=get_team().opponent())) == 0 and get_money() > 2000 and turn_count >= 10:
+        closest_ally = has_nearby_robots()
+        # disintegrate()
+        if closest_ally is not None:
+            flicker(closest_ally)
+            return
     cur_round = get_round_num()
     next_loc = None
-    for dir in directions:
-        loc = get_location().add(dir)
-        if sense_map_info(loc).is_passable():
-            next_loc = loc
+    for tile in sense_nearby_map_infos(radius_squared=4):
+        tile_loc = tile.get_map_location()
+        if tile.is_passable() and sense_robot_at_location(tile_loc) is None:
+            next_loc = tile_loc
             break
-    if cur_round == 1 and is_starting_tower:
+    if next_loc is None:
+        log("No positions to spawn")
+    if cur_round == 1 and next_loc is not None:
         build_robot(UnitType.SOLDIER, next_loc)
-    elif cur_round == 2 and is_starting_tower:
-        if get_type() == UnitType.LEVEL_ONE_MONEY_TOWER:
-            build_robot(UnitType.SPLASHER, next_loc)
+    if cur_round == 2 and next_loc is not None:
+        if cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER:
+            if height * width >= 1000:
+                build_robot(UnitType.SOLDIER, next_loc)
+            else:
+                build_robot(UnitType.SPLASHER, next_loc)
         else:
-            build_robot(UnitType.SOLDIER)
+            build_robot(UnitType.SOLDIER, next_loc)
     # else:
     #     # if cur_round > 4:
     #     #     nearby_enemy_robots = sense_nearby_robots(team = get_team().opponent())
@@ -394,49 +397,57 @@ def run_tower():
     #         else:
     #             spawned_moppers += 1
 
-    if height * width <= 800:
-        soldier_ratio = 50
-        mopper_ratio = 55
-    elif height * width <= 1600:
-        soldier_ratio = 65
-        mopper_ratio = 67
+    # if height * width <= 800:
+    #     soldier_ratio = 50
+    #     mopper_ratio = 55
+    # elif height * width <= 1600:
+    #     soldier_ratio = 65
+    #     mopper_ratio = 67
+    # else:
+    #     if cur_round <= 100:
+    #         soldier_ratio = 75
+    #         mopper_ratio = 77
+    #     elif cur_round <= 250:
+    #         soldier_ratio = 55
+    #         mopper_ratio = 59
+    #     else:
+    #         soldier_ratio = 50
+    #         mopper_ratio = 55
+    # If we have no save turns remaining, start building robots
+    should_save = False
+
+    # Pick a random robot type to build.
+    robot_type = None
+    if cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER:
+        robot_type = money_tower_spawn[current_tower_index % len(money_tower_spawn)]
+        if get_paint() < 200:
+            robot_type = UnitType.MOPPER
     else:
-        if cur_round <= 100:
-            soldier_ratio = 75
-            mopper_ratio = 77
-        elif cur_round <= 250:
-            soldier_ratio = 55
-            mopper_ratio = 59
+        if cur_round < mid_game_start:
+            robot_type = early_game_spawn[current_tower_index % len(early_game_spawn)]
+        elif cur_round < end_game_start:
+            robot_type = mid_game_spawn[current_tower_index % len(mid_game_spawn)]
         else:
-            soldier_ratio = 50
-            mopper_ratio = 55
-    if cur_round >= 700 and get_num_towers() <= 4:
-        soldier_ratio = 50
-        mopper_ratio = 55 
+            robot_type = end_game_spawn[current_tower_index % len(end_game_spawn)]
 
-    random_number=random.randint(1,2500)
-    if random_number <= get_money():
-        # If we have no save turns remaining, start building robots
-        should_save = False
+    if can_build_robot(robot_type, next_loc) and get_chips() >= robot_type.money_cost + 1000 and is_action_ready():
+        build_robot(robot_type, next_loc)
+        log("BUILT A DUDE")
+        current_tower_index += 1
 
-        # Pick a direction to build in.
-        dir = directions[random.randint(0, len(directions) - 1)]
-        next_loc = get_location().add(dir)
 
-        # Pick a random robot type to build.
-        robot_type = random.randint(1, 100)
-        if robot_type <= soldier_ratio and can_build_robot(UnitType.SOLDIER, next_loc):
-            build_robot(UnitType.SOLDIER, next_loc)
-            spawned_soldiers += 1
-            log("BUILT A SOLDIER")
-        if robot_type > soldier_ratio and robot_type <= mopper_ratio and can_build_robot(UnitType.MOPPER, next_loc):
-            build_robot(UnitType.MOPPER, next_loc)
-            spawned_moppers += 1
-            log("BUILT A MOPPER")
-        if robot_type <= 100 and robot_type > mopper_ratio and can_build_robot(UnitType.SPLASHER, next_loc):
-            build_robot(UnitType.SPLASHER, next_loc)
-            spawned_splashers += 1
-            log("BUILT A SPLASHER") 
+        # if robot_type <= soldier_ratio and can_build_robot(UnitType.SOLDIER, next_loc):
+        #     build_robot(UnitType.SOLDIER, next_loc)
+        #     spawned_soldiers += 1
+        #     log("BUILT A SOLDIER")
+        # if robot_type > soldier_ratio and robot_type <= mopper_ratio and can_build_robot(UnitType.MOPPER, next_loc):
+        #     build_robot(UnitType.MOPPER, next_loc)
+        #     spawned_moppers += 1
+        #     log("BUILT A MOPPER")
+        # if robot_type <= 100 and robot_type > mopper_ratio and can_build_robot(UnitType.SPLASHER, next_loc):
+        #     build_robot(UnitType.SPLASHER, next_loc)
+        #     spawned_splashers += 1
+        #     log("BUILT A SPLASHER") 
 
     # Read incoming messages
     messages = read_messages()
@@ -456,7 +467,8 @@ def run_tower():
         if (can_attack(robot.get_location()) and robot_health < min_health):
             min_health = robot_health
             min_health_enemy = robot.get_location()
-    attack(min_health_enemy)
+    if is_action_ready():
+        attack(min_health_enemy)
     # t_type = get_type()
     # if len(nearbyRobots) > 0 and has_spawned_mopper == False and (t_type == UnitType.LEVEL_ONE_PAINT_TOWER or t_type == UnitType.LEVEL_TWO_PAINT_TOWER or t_type == UnitType.LEVEL_THREE_PAINT_TOWER):
     #     if can_build_robot( )
@@ -466,13 +478,14 @@ def upgrade_nearby_paint_towers():
     ally_robots  = sense_nearby_robots(team=get_team())
     for ally in ally_robots:
         # Only consider tower type
-        if not ally.get_type().is_tower_type():
+        ally_type = ally.get_type()
+        if not ally_type.is_tower_type():
             continue
 
         ally_loc = ally.location
-        if ((ally.get_type() == UnitType.LEVEL_ONE_PAINT_TOWER or ally.get_type() == UnitType.LEVEL_ONE_DEFENSE_TOWER) and get_money() >= 5000) and can_upgrade_tower(ally_loc):
+        if ((ally_type == UnitType.LEVEL_ONE_PAINT_TOWER or ally_type == UnitType.LEVEL_ONE_DEFENSE_TOWER) and get_money() >= 5000) and can_upgrade_tower(ally_loc):
             upgrade_tower(ally_loc)
-        if ally.get_type() == UnitType.LEVEL_TWO_PAINT_TOWER and can_upgrade_tower(ally_loc) and get_money() >= 8000:
+        if (ally_type == UnitType.LEVEL_TWO_PAINT_TOWER or ally_type == UnitType.LEVEL_TWO_DEFENSE_TOWER) and can_upgrade_tower(ally_loc) and get_money() >= 8000:
             upgrade_tower(ally_loc)
 
 def refill_paint():
@@ -481,14 +494,14 @@ def refill_paint():
     global paint_capacity
 
     # Resets refilling to 0
-    if not len(known_towers) > 0:
+    if len(known_paint_towers) == 0:
         is_refilling = False
         return
     
     # Finds the nearest tower
     cur_tower = None
     cur_dist = 9999999
-    for tower in known_towers:
+    for tower in known_paint_towers:
         check_dist = tower.distance_squared_to(get_location())
         if check_dist < cur_dist:
             cur_dist = check_dist
@@ -496,10 +509,9 @@ def refill_paint():
 
     if cur_tower is not None:
         # Find robot at the tower's location
-        dir = get_location().direction_to(cur_tower)
         set_indicator_string(f"Returning to {cur_tower}")
         next_dir = bug2(cur_tower)
-        if next_dir is not None:
+        if next_dir is not None and can_move(next_dir):
             move(next_dir)
         if can_sense_robot_at_location(cur_tower):
             tower_robot = sense_robot_at_location(cur_tower)
@@ -527,8 +539,47 @@ def mark_patterns():
             if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, tile_loc):
                 complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, tile_loc)
 
+def get_next_SRP_loc(cur_loc):
+    global next_SRP_loc
+    if cur_loc.x % 4 == 2 and cur_loc.y % 4 == 2:
+        next_loc = None
+        valid_loc = None
+        for x in [cur_loc.x-4, cur_loc.x, cur_loc.x+4]:
+            for y in [cur_loc.y-4, cur_loc.y, cur_loc.y+4]:
+                if x < 0 or x >= width or y < 0 or y >= height:
+                    continue
+                if can_sense_location(MapLocation(x,y)) == False:
+                    continue
+                tile_info = sense_map_info(MapLocation(x,y))
+                if tile_info.is_passable() == False:
+                    continue
+                valid_loc = MapLocation(x,y)
+                if tile_info.is_resource_pattern_center() == False:
+                    next_loc = MapLocation(x,y)
+                    break
+            if next_loc is not None:
+                break
+        if next_loc is None:
+            next_SRP_loc = valid_loc
+        else:
+            next_SRP_loc = next_loc
+    else:
+        next_loc = None
+        valid_loc = None
+        for tile in sense_nearby_map_infos():
+            tile_loc = tile.get_map_location()
+            if tile_loc.x % 4 == 2 and tile_loc.y % 4 == 2:
+                valid_loc = tile_loc
+                if tile.is_resource_pattern_center() == False:
+                    next_loc = tile_loc
+                    break
+        if next_loc is None:
+            next_SRP_loc = valid_loc
+        else:
+            next_SRP_loc = next_loc
+
 def can_SRP():
-    if not can_mark_resource_pattern(get_location()) or get_paint() <= 150 or get_num_towers() < 4 or get_round_num() <= 75:
+    if not can_mark_resource_pattern(get_location()) or get_paint() <= 150 or get_num_towers() < 4 or get_round_num() <= 75 or sense_map_info(get_location()).is_resource_pattern_center():
         return False
     min_dist = 9999
     for tower_loc in known_money_towers:
@@ -538,32 +589,52 @@ def can_SRP():
     if min_dist < 32:
         return False
     for tile in sense_nearby_map_infos(get_location(), 8):
-        tile_robot = sense_robot_at_location(tile.get_map_location())
-        if tile.get_paint().is_enemy() or tile.get_mark() != PaintType.EMPTY:
+        # tile_robot = sense_robot_at_location(tile.get_map_location())
+        if tile.get_paint().is_enemy():
             return False
-        elif tile.get_paint() == PaintType.ALLY_SECONDARY and tile_robot is not None and tile_robot.get_team() == get_team() and tile_robot.get_type().is_robot_type():
-            return False
+        # elif tile.get_paint() == PaintType.ALLY_SECONDARY and tile_robot is not None and tile_robot.get_team() == get_team() and tile_robot.get_type().is_robot_type():
+        #     return False
     return True
+
+def isWithinPattern(cur_loc, ruin_loc):
+    return abs(cur_loc.x - ruin_loc.x) <= 2 and abs(cur_loc.y - ruin_loc.y) <= 2 and ruin_loc != cur_loc
+
+def get_is_secondary_SRP(paint_loc, SRP_loc):
+    global SRP_pattern
+    col = paint_loc.x - SRP_loc.x + 2
+    row = paint_loc.y - SRP_loc.y + 2
+    return SRP_pattern[col][row]
 
 def SRP_mark():
     global is_marking_SRP
     global has_marked_SRP
+    global next_SRP_loc
     cur_loc = get_location()
-    if has_marked_SRP == False:
-        mark_resource_pattern(cur_loc)
-        has_marked_SRP = True
     for pattern_tile in sense_nearby_map_infos(cur_loc, 8):
-            if pattern_tile.get_mark() != pattern_tile.get_paint() and pattern_tile.get_mark() != PaintType.EMPTY:
-                use_secondary = pattern_tile.get_mark() == PaintType.ALLY_SECONDARY
-                if can_attack(pattern_tile.get_map_location()):
-                    attack(pattern_tile.get_map_location(), use_secondary)
+            tile_loc = pattern_tile.get_map_location()
+            use_secondary = get_is_secondary_SRP(tile_loc, cur_loc)
+            tile_paint = pattern_tile.get_paint()
+            if tile_paint.is_secondary() != use_secondary or tile_paint == PaintType.EMPTY:
+                if can_attack(tile_loc):
+                    attack(tile_loc, use_secondary)
     if can_complete_resource_pattern(cur_loc):
         complete_resource_pattern(cur_loc)
         is_marking_SRP = False
         has_marked_SRP = False
+        next_SRP_loc = None
 
-def isWithinPattern(cur_loc, ruin_loc):
-    return abs(cur_loc.x - ruin_loc.x) <= 2 and abs(cur_loc.y - ruin_loc.y) <= 2 and ruin_loc != cur_loc
+def has_nearby_enemy_paint(ruin_loc):
+    cur_team = get_team()
+    for tile in sense_nearby_map_infos(ruin_loc, 8):
+        if tile.get_paint().is_enemy():
+            has_mopper = False
+            for t in sense_nearby_robots(tile.get_map_location()):
+                if t.get_type() == UnitType.MOPPER and t.get_team() == cur_team:
+                    has_mopper = True
+                    break
+            if has_mopper == False:
+                return False
+    return True
 
 def get_is_secondary(ruin_loc, paint_loc, tower_type):
     global defense_tower_pattern
@@ -586,43 +657,78 @@ def run_paint_pattern():
     global painting_ruin_loc
     global tower_type
     global is_painting_pattern
-    global has_marked_tower
-    if has_marked_tower == False and can_mark_tower_pattern(tower_type, painting_ruin_loc):
-        mark_tower_pattern(tower_type, painting_ruin_loc)
-        has_marked_tower = True
-    if painting_turns % 2 == 0:
-        to_ruin = get_location().direction_to(painting_ruin_loc)
-        tangent = to_ruin.rotate_right().rotate_right()
-        dist = get_location().distance_squared_to(painting_ruin_loc)
-        
-        if dist > 4:
-            tangent = tangent.rotate_left()
-        if can_move(tangent):
-            move(tangent)
-    if is_action_ready():
-        infos = sense_nearby_map_infos(radius_squared=3)
-        attacked = False
-        for info in infos:
-            info_paint = info.get_paint()
-            loc = info.get_map_location()
-            isSecondary = get_is_secondary(painting_ruin_loc, loc, tower_type)
-            if can_attack(loc) and (info_paint == PaintType.EMPTY or info_paint.is_secondary() != isSecondary) and isWithinPattern(loc, painting_ruin_loc):
-                attack(loc, isSecondary)
-                attacked = True
-                turns_without_attack = 0
-                break
-        if attacked == False:
-            turns_without_attack += 1
+    global is_flickering_tower
+
+    cur_dist = get_location().distance_squared_to(painting_ruin_loc)
+
+    if cur_dist == 1 and get_paint() < 5:
+        disintegrate()
+
+    dir = get_location().direction_to(painting_ruin_loc)
+    if cur_dist == 2:
+        left_dir = dir.rotate_left()
+        right_dir = dir.rotate_right()
+        if can_move(left_dir):
+            move(left_dir)
+        elif can_move(right_dir):
+            move(right_dir)
+    else:
+        right_dir = dir.rotate_right()
+        if can_move(right_dir):
+            move(right_dir)
+
+    tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
+    # mark_loc_down = MapLocation(painting_ruin_loc.x, painting_ruin_loc.y-1)
+    # mark_loc_up = MapLocation(painting_ruin_loc.x, painting_ruin_loc.y+1)
+    # tower_mark_down = sense_map_info(mark_loc_down).get_mark()
+    # tower_mark_up = sense_map_info(mark_loc_up).get_mark()
+
+    # if tower_mark_down == PaintType.EMPTY and tower_mark_up == PaintType.EMPTY:
+    #     # Move to optimal marking position if needed
+    #     # optimal_pos = MapLocation(painting_ruin_loc.x-1, painting_ruin_loc.y)
+    #     # if get_location().distance_squared_to(optimal_pos) > 0:
+    #     #     dir = bug2(optimal_pos)
+    #     #     if dir is not None:
+    #     #         move(dir)
+    #     #         return  # Wait until next turn to mark
+    #     build_type = build_tower_type(painting_ruin_loc)
+    #     if build_type == UnitType.LEVEL_ONE_MONEY_TOWER or build_type == UnitType.LEVEL_ONE_PAINT_TOWER:
+    #         if can_mark(mark_loc_down) == False:
+    #             return
+    #         if build_type == UnitType.LEVEL_ONE_MONEY_TOWER:
+    #             mark(mark_loc_down, True)
+    #         else:
+    #             mark(mark_loc_down, False)
+    #     else:
+    #         if can_mark(mark_loc_up) == False:
+    #             return
+    #         mark(mark_loc_up, True)
+
+    # tower_type = None
+
+    # if tower_mark_down == PaintType.ALLY_PRIMARY:
+    #     tower_type = UnitType.LEVEL_ONE_PAINT_TOWER
+    # elif tower_mark_down == PaintType.ALLY_SECONDARY:
+    #     tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
+    # else:
+    #     tower_type = UnitType.LEVEL_ONE_DEFENSE_TOWER
+    infos = sense_nearby_map_infos(radius_squared=9)
+    for info in infos:
+        info_paint = info.get_paint()
+        loc = info.get_map_location()
+        isSecondary = get_is_secondary(painting_ruin_loc, loc, tower_type)
+        if can_attack(loc) and (info_paint == PaintType.EMPTY or info_paint.is_secondary() != isSecondary) and isWithinPattern(loc, painting_ruin_loc):
+            attack(loc, isSecondary)
+            break
     
     if (can_complete_tower_pattern(tower_type, painting_ruin_loc)):
         complete_tower_pattern(tower_type, painting_ruin_loc)
+    if sense_robot_at_location(painting_ruin_loc) is not None:
         is_painting_pattern = False
-        has_marked_tower = False
-
-    if turns_without_attack > 3:
-        is_painting_pattern = False
+        is_flickering_tower = False
 
 def taint():
+    cur_loc = get_location()
     if is_action_ready() == False:
         return
     global tainted_ruins
@@ -641,8 +747,8 @@ def taint():
                     tainted = True
                     break
                 if tile.get_paint() == PaintType.EMPTY:
-                    if get_location().distance_squared_to(tile.get_map_location()) <= min_dist:
-                        min_dist = get_location().distance_squared_to(tile.get_map_location())
+                    if cur_loc.distance_squared_to(tile.get_map_location()) <= min_dist:
+                        min_dist = cur_loc.distance_squared_to(tile.get_map_location())
                         attack_loc = tile.get_map_location()
             if tainted:
                 tainted_ruins.append(ruin)
@@ -651,38 +757,38 @@ def taint():
                     attack(attack_loc)
                     tainted_ruins.append(ruin)
 
-# def input_messages():
-#     global flicker_tower_loc
-#     global is_flickering_tower
-#     messages_1 = read_messages(get_round_num() - 1)
-#     messages_2 = read_messages(get_round_num())
-#     messages = messages_1 + messages_2
-#     for message in messages:
-#         msg_bytes = message.get_bytes()
-#         if msg_bytes < 1:
-#             continue
-#         adjusted = msg_bytes - 1  # Subtract the +1 added during encoding
-#         x = adjusted // 64
-#         y = adjusted % 64
-#         tower_loc = MapLocation(x, y)
-#         flicker_tower_loc = tower_loc
-#         is_flickering_tower = True
+def nearby_soldiers_painting_ruin(ruin_loc):
+    soldier_count = 0
+    for tile in sense_nearby_map_infos(ruin_loc, 1):
+        robot = sense_robot_at_location(tile.get_map_location())
+        if robot is not None and robot.get_team() == get_team():
+            soldier_count += 1
+    return soldier_count
 
-def has_nearby_enemy_paint(ruin_loc):
-    for tile in sense_nearby_map_infos(ruin_loc, 8):
-        if tile.get_paint().is_enemy():
-            has_mopper = False
-            for t in sense_nearby_robots(tile.get_map_location()):
-                if t.get_type() == UnitType.MOPPER:
-                    has_mopper = True
-                    break
-            if has_mopper == False:
-                return False
-    return True
+def input_messages():
+    global flicker_tower_loc
+    global is_flickering_tower
+    cur_round = get_round_num()
+    if cur_round == 1:
+        return
+    messages = read_messages()
+    if len(messages) == 0:
+        return
+    for message in messages:
+        if message.get_round() < cur_round - 1:
+            continue
+        msg_bytes = message.get_bytes()
+        if msg_bytes < 1:
+            continue
+        adjusted = msg_bytes - 1  # Subtract the +1 added during encoding
+        x = adjusted // 64
+        y = adjusted % 64
+        flicker_tower_loc = MapLocation(x, y)
+        is_flickering_tower = True
+        log("Received flicker message from tower")
+        return
 
 def run_soldier():
-    if is_attackingsoldier:
-        set_indicator_dot(get_location(), 255,0,0)
     # Global variables
     global is_refilling
     global current_target
@@ -698,60 +804,83 @@ def run_soldier():
     global tower_type
     global SRP_positions
     global is_SRP_builder
+    global attacking_turns
+    global non_attacking_turns
+    global is_attackingsoldier
+    global next_SRP_loc
+    global is_flickering_tower
+    global flicker_tower_loc
 
     cur_loc = get_location()
 
-    mark_patterns()
+    if is_attackingsoldier:
+        set_indicator_dot(cur_loc, 255,0,0)
+    if is_flickering_tower:
+        set_indicator_dot(cur_loc, 0,255,0)
+
+    if is_attackingsoldier:
+        if attacking_turns >= 40:
+            is_attackingsoldier = False
+            attacking_turns = 0
+        else:
+            attacking_turns += 1
+
+    taint()
+
+    if is_painting_pattern:
+        set_indicator_dot(cur_loc, 0,0,255)
+        run_paint_pattern()
+        painting_turns += 1
+        return
+
+    input_messages()
+
+    if is_flickering_tower:
+        if flicker_tower_loc is None:
+            is_flickering_tower = False
+            return
+        cur_dist = cur_loc.distance_squared_to(flicker_tower_loc)
+        if cur_dist > 4:
+            move_dir = bug2(flicker_tower_loc)
+            if move_dir is not None and can_move(move_dir):
+                move(move_dir)
+            return
+        if sense_robot_at_location(flicker_tower_loc) is not None:
+            is_flickering_tower = False
+            return
+        else:
+            is_painting_pattern = True
+            turns_without_attack = 0
+            painting_turns = 0
+            painting_ruin_loc = flicker_tower_loc
+
+    if get_paint() <= 20:
+        is_refilling = True
+    if is_refilling == True: 
+        refill_paint()
+        return
 
     if is_SRP_builder:
         if is_marking_SRP:
             SRP_mark()
             return
         else:
-            if can_SRP():
+            if cur_loc.x % 4 == 2 and cur_loc.y % 4 == 2 and can_SRP():
                 is_marking_SRP = True
                 return
+            elif next_SRP_loc is None:
+                next_SRP_loc = get_next_SRP_loc(cur_loc)
+            else:
+                next_dir = bug2(next_SRP_loc)
+                if next_dir is not None and can_move(next_dir):
+                    move(next_dir)
 
     if turn_count == 1:
         move_count = 0
 
     upgrade_nearby_paint_towers()
 
-    # input_messages()
-
-    # if is_flickering_tower:
-    #     if flicker_tower_loc is None:
-    #         is_flickering_tower = False
-    #     tower_dist = get_location().distance_squared_to(flicker_tower_loc)
-    #     dir = bug2(flicker_tower_loc)
-    #     if dir is not None:
-    #         move(dir)
-    #     for pattern_tile in sense_nearby_map_infos(flicker_tower_loc, 8):
-    #         if pattern_tile.get_mark() != pattern_tile.get_paint() and pattern_tile.get_mark() != PaintType.EMPTY:
-    #             use_secondary = pattern_tile.get_mark() == PaintType.ALLY_SECONDARY
-    #             if can_attack(pattern_tile.get_map_location()):
-    #                 attack(pattern_tile.get_map_location(), use_secondary)
-    #     if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc):
-    #         complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc)
-    #         set_timeline_marker("Tower built", 0, 255, 0)
-    #         log("Built a tower at " + str(flicker_tower_loc) + "!")
-    #         is_flickering_tower = False
-    #         flicker_tower_loc = None
-    #     return
-
     #Checks if refilling is needed
-    if get_paint() <= 20:
-        is_refilling = True
-    if is_refilling == True: 
-        refill_paint()
-        return
-    
-    taint()
-
-    # if is_painting_pattern:
-    #     run_paint_pattern()
-    #     painting_turns += 1
-    #     return
 
     # Sense information about all visible nearby tiles.
     nearby_tiles = sense_nearby_map_infos()
@@ -762,22 +891,87 @@ def run_soldier():
     # Search if there are any enemy towers
     cur_enemy_tower = None
     for tile in nearby_tiles:
-        if tile.has_ruin() and sense_robot_at_location(tile.get_map_location()) is None and has_nearby_enemy_paint(tile.get_map_location()):
-            check_dist = tile.get_map_location().distance_squared_to(get_location())
+        tile_loc = tile.get_map_location()
+        if tile.has_ruin() and sense_robot_at_location(tile_loc) is None and has_nearby_enemy_paint(tile_loc) == True and nearby_soldiers_painting_ruin(tile_loc) < 2:
+            check_dist = tile_loc.distance_squared_to(cur_loc)
             if check_dist < cur_dist:
                 cur_dist = check_dist
                 cur_ruin = tile
-        if is_attackingsoldier:
-            tile_robot = sense_robot_at_location(tile.get_map_location())
-            if tile_robot is not None and tile_robot.get_type().is_tower_type() and not tile_robot.get_team() == get_team():
-                cur_enemy_tower = tile.get_map_location()
+        tile_robot = sense_robot_at_location(tile_loc)
+        if tile_robot is not None and tile_robot.get_type().is_tower_type() and not tile_robot.get_team() == get_team():
+            cur_enemy_tower = tile_loc
+
+    if cur_ruin is not None:
+        if cur_dist == 1 and get_paint() < 5:
+            disintegrate()
+        if cur_dist > 2: 
+            move_dir = bug2(cur_ruin.get_map_location())
+            if move_dir is not None and can_move(move_dir):
+                move(move_dir)
+        cur_dist = get_location().distance_squared_to(cur_ruin.get_map_location())
+        if cur_dist <= 4:
+            is_painting_pattern = True
+            turns_without_attack = 0
+            painting_turns = 0
+            painting_ruin_loc = cur_ruin.get_map_location()
+            return
+        return
+        # target_loc = cur_ruin.get_map_location()
+        
+        # dir = get_location().direction_to(target_loc)
+        # if can_move(dir):
+        #     move(dir)
+
+        # mark_loc_down = MapLocation(target_loc.x, target_loc.y-1)
+        # mark_loc_up = MapLocation(target_loc.x, target_loc.y+1)
+        # tower_mark_down = sense_map_info(mark_loc_down).get_mark()
+        # tower_mark_up = sense_map_info(mark_loc_up).get_mark()
+
+        # if tower_mark_down == PaintType.EMPTY and tower_mark_up == PaintType.EMPTY:
+        #     build_type = build_tower_type(target_loc)
+        #     if build_type == UnitType.LEVEL_ONE_MONEY_TOWER:
+        #         mark(mark_loc_down, True)
+        #     elif build_type == UnitType.LEVEL_ONE_PAINT_TOWER:
+        #         mark(mark_loc_down, False)
+        #     else:
+        #         mark(mark_loc_up, True)
+
+        # tower_type = None
+
+        # if tower_mark_down == PaintType.ALLY_PRIMARY:
+        #     tower_type = UnitType.LEVEL_ONE_PAINT_TOWER
+        # elif tower_mark_down == PaintType.ALLY_SECONDARY:
+        #     tower_type = UnitType.LEVEL_ONE_MONEY_TOWER
+        # else:
+        #     tower_type = UnitType.LEVEL_ONE_DEFENSE_TOWER
+
+        # Fill in any spots in the pattern with the appropriate paint.
+        # for pattern_tile in sense_nearby_map_infos(target_loc, 8):
+        #     if isWithinPattern(pattern_tile.get_map_location(), target_loc) == False:
+        #         continue
+        #     use_secondary = get_is_secondary(target_loc, pattern_tile.get_map_location(), tower_type)
+        #     if pattern_tile.get_paint() == PaintType.EMPTY or pattern_tile.get_paint().is_secondary() != use_secondary:
+        #         if can_attack(pattern_tile.get_map_location()):
+        #             attack(pattern_tile.get_map_location(), use_secondary)
+
+        # if can_complete_tower_pattern(tower_type, target_loc):
+        #     complete_tower_pattern(tower_type, target_loc)
+        #     set_timeline_marker("Tower built", 0, 255, 0)
+        #     log("Built a tower at " + str(target_loc) + "!")
+
+        # if sense_robot_at_location(target_loc):
+        #     tower_type = None
+
+    mark_patterns()
+
+    update_friendly_towers()
 
     # Attacks enemy tower 
-    if cur_enemy_tower is not None and is_attackingsoldier:
-        enemy_tower_dist = get_location().distance_squared_to(cur_enemy_tower)
+    if cur_enemy_tower is not None:
+        enemy_tower_dist = cur_loc.distance_squared_to(cur_enemy_tower)
         dir = bug2(cur_enemy_tower)
         if enemy_tower_dist > 4:
-            if dir is not None:
+            if dir is not None and can_move(dir):
                 move(dir)
             if can_attack(cur_enemy_tower):
                 log("Gotta kill em all")
@@ -786,7 +980,7 @@ def run_soldier():
             if can_attack(cur_enemy_tower):
                 log("Gotta kill em all")
                 attack(cur_enemy_tower)
-            away = get_location().direction_to(cur_enemy_tower).opposite()
+            away = cur_loc.direction_to(cur_enemy_tower).opposite()
             if can_move(away):
                 move(away)
             elif can_move(away.rotate_left()):
@@ -794,48 +988,6 @@ def run_soldier():
             elif can_move(away.rotate_right()):
                 move(away.rotate_right())
 
-    if cur_ruin is not None:
-        # if cur_dist > 4: 
-        #     move_dir = bug2(cur_ruin.get_map_location())
-        #     if move_dir is not None:
-        #         move(move_dir)
-        #     return
-        # else:
-        #     is_painting_pattern = True
-        #     turns_without_attack = 0
-        #     painting_turns = 0
-        #     painting_ruin_loc = cur_ruin.get_map_location()
-        #     tower_type = build_tower_type(painting_ruin_loc)
-        #     return
-        target_loc = cur_ruin.get_map_location()
-        if tower_type is None:
-            tower_type = build_tower_type(target_loc)
-        dir = get_location().direction_to(target_loc)
-        if can_move(dir):
-            move(dir)
-
-        # Mark the pattern we need to draw to build a tower here if we haven't already.
-        should_mark = cur_ruin.get_map_location().subtract(dir)
-        if sense_map_info(should_mark).get_mark() == PaintType.EMPTY and can_mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-            mark_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
-            log("Trying to build a tower at " + str(target_loc))
-        
-        # Fill in any spots in the pattern with the appropriate paint.
-        for pattern_tile in sense_nearby_map_infos(target_loc, 8):
-            if pattern_tile.get_mark() != pattern_tile.get_paint() and pattern_tile.get_mark() != PaintType.EMPTY:
-                use_secondary = pattern_tile.get_mark() == PaintType.ALLY_SECONDARY
-                if can_attack(pattern_tile.get_map_location()):
-                    attack(pattern_tile.get_map_location(), use_secondary)
-
-        # Complete the ruin if we can.
-        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc):
-            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, target_loc)
-            set_timeline_marker("Tower built", 0, 255, 0)
-            log("Built a tower at " + str(target_loc) + "!")
-
-        if sense_robot_at_location(target_loc):
-            tower_type = None
-        
     if is_attackingsoldier and (turn_count == 1 or current_target is None):
         rand = random.randint(1,3)
         if rand == 1:
@@ -847,8 +999,6 @@ def run_soldier():
         move_count = 0
 
     mark_patterns()
-
-    update_friendly_towers()
 
     # for tile in nearby_tiles:
     #     if tile.get_paint() == PaintType.EMPTY:
@@ -865,29 +1015,32 @@ def run_soldier():
         if can_move(dir):
             move(dir)
     elif current_target is not None:
-        if is_attackingsoldier == False and (get_location().distance_squared_to(current_target) <= 5 or move_count >= 100):
+        if is_attackingsoldier == False and (cur_loc.distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
             current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
             tracing_turns = 0
             move_count = 0
-        if is_attackingsoldier and get_location().distance_squared_to(current_target) <= 2:
+        if is_attackingsoldier and cur_loc.distance_squared_to(current_target) <= 2:
             current_target = None
         move_count += 1
         if current_target is not None:
             search_dir = bug2(current_target)
-            if search_dir is not None:
+            if search_dir is not None and can_move(search_dir):
                 move(search_dir)
- 
+    
+    loc = get_location()
+
     # Try to paint beneath us as we walk to avoid paint penalties.
     # Avoiding wasting paint by re-painting our own tiles.
     if get_round_num() > 150:
-        current_tile = sense_map_info(get_location())
-        if not current_tile.get_paint().is_ally() and can_attack(get_location()):
-            attack(get_location())
+        current_tile = sense_map_info(loc)
+        if not current_tile.get_paint().is_ally() and can_attack(loc):
+            attack(loc)
         else:
-            for tile in sense_nearby_map_infos(get_location(), 3):
-                if tile.get_paint() == PaintType.EMPTY and can_attack(tile.get_map_location()):
-                    attack(tile.get_map_location())
+            for tile in sense_nearby_map_infos(loc, 3):
+                t_loc = tile.get_map_location()
+                if tile.get_paint() == PaintType.EMPTY and can_attack(t_loc):
+                    attack(t_loc)
 
 def max(a, b):
     if a < b:
@@ -900,44 +1053,34 @@ def run_mopper():
     global targets
     global tracing_turns
     global is_removing_enemy_paint
-
+    global move_count
+    global is_flickering_tower
+    global flicker_tower_loc
     upgrade_nearby_paint_towers()
-    
-    if should_save and len(known_towers) > 0:
-        # Move to first known tower if we are saving
-        cur_tower = None
-        cur_dist = 9999999
-        for tower in known_towers:
-            check_dist = tower.get_map_location().distance_squared_to(get_location())
-            if check_dist < cur_dist:
-                cur_dist = check_dist
-                cur_tower = tower
-        dir = get_location().direction_to(cur_tower)
-        set_indicator_string(f"Returning to {known_towers[0]}")
-        if cur_tower != None:
-            next_dir = bug2(cur_tower)
-            move(next_dir)
 
-    # Finds ruins nearby and checks if it is buildable
-    nearby_tiles = sense_nearby_map_infos()
-    for tile in nearby_tiles:
-        if is_removing_enemy_paint:
-            break
-        tile_loc = tile.get_map_location()
-        robot_tile = sense_robot_at_location(tile_loc)
-        if tile.has_ruin() and (robot_tile is None or (robot_tile.get_team() == get_team())):
-            for ntile in sense_nearby_map_infos(tile_loc, 8):
-                if can_sense_location(ntile.get_map_location()) and ntile.get_paint().is_enemy():
-                    current_target = ntile.get_map_location()
-                    is_removing_enemy_paint = True
-                    break
+    cur_loc = get_location()
+
+    if is_flickering_tower:
+        set_indicator_dot(cur_loc, 0,255,0)
 
     update_friendly_towers()
 
-    mark_patterns()
+    input_messages()
 
-    cur_loc = get_location()
-    enemy_robots= sense_nearby_robots(get_location(),5,team = get_team().opponent())
+    if is_flickering_tower:
+        cur_dist = cur_loc.distance_squared_to(flicker_tower_loc)
+        if cur_dist > 2:
+            move_dir = bug2(flicker_tower_loc)
+            if move_dir is not None and can_move(move_dir):
+                move(move_dir)
+            return
+        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc):
+            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc)
+            is_flickering_tower = False
+            flicker_tower_loc = None 
+
+    # TODO mop_swing op hehe
+    enemy_robots= sense_nearby_robots(cur_loc,2,team = get_team().opponent())
 
     count_west = 0
     count_north = 0
@@ -945,8 +1088,9 @@ def run_mopper():
     count_south = 0
 
     for robot in enemy_robots:
-        loc = robot.get_location()  # Ensure get_location() returns an object or tuple
+        loc = robot.get_location()  
         robot_x, robot_y = loc.x, loc.y
+
         if robot_x > cur_loc.x:
             count_east += 1
         if robot_x < cur_loc.x:
@@ -959,57 +1103,56 @@ def run_mopper():
 
     ma_count = max(count_east, max(count_north, max(count_south, count_west)))
 
-    if count_west == ma_count:
-        if can_mop_swing(directions.WEST):
+    if count_west == ma_count :
+        if can_mop_swing(directions.WEST) :
             mop_swing(directions.WEST)
-    elif count_north == ma_count:
-        if can_mop_swing(directions.NORTH):
+    elif count_north == ma_count :
+        if can_mop_swing(directions.NORTH) :
             mop_swing(directions.NORTH)
-    elif count_south == ma_count:
-        if can_mop_swing(directions.SOUTH):
+    elif count_south == ma_count :
+        if can_mop_swing(directions.SOUTH) :
             mop_swing(directions.SOUTH)
-    elif count_east == ma_count:
-        if can_mop_swing(directions.EAST):
+    elif count_east == ma_count :
+        if can_mop_swing(directions.EAST) :
             mop_swing(directions.EAST)
 
-    if is_removing_enemy_paint and (can_attack(current_target) or (can_sense_location(current_target) and sense_map_info(current_target).get_paint().is_ally())):
-        if can_attack(current_target):
-            attack(current_target)
-        current_target = None
-        is_removing_enemy_paint = False
+    is_move = False
+    # skibidi movement
+    range_atk = sense_nearby_map_infos(cur_loc,2)
+    for tile in range_atk:
+        if tile.get_paint().is_enemy() == True:
+            if can_attack(tile.get_map_location()): 
+                attack(tile.get_map_location())
+        if tile.get_paint().is_enemy() == True:
+            is_move = True
+            log("skibidi dop dop yes yes")
 
-    enemy_robots = sense_nearby_robots(get_location(),2,team=get_team().opponent())    
-    for robot in enemy_robots:
-        robot_dir = get_location().direction_to(robot.get_location())
-        if can_mop_swing(robot_dir):
-            mop_swing(robot_dir)
+    if is_move == False:
+        if current_target is not None and current_target.distance_squared_to(cur_loc) <= 1 :
+            current_target = None 
 
-    if current_target is None or (is_removing_enemy_paint == False and get_location().distance_squared_to(current_target) <= 5):
-        log("Reached target, now changing to new target")
-        current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
-        tracing_turns = 0
+        map_infos= sense_nearby_map_infos(cur_loc, 20)
+        cur_dis = 10000000000000000000
+        for tile in map_infos :
+            if tile.get_paint().is_enemy() == True:
+                if tile.get_map_location().distance_squared_to(cur_loc) < cur_dis :
+                    current_target = tile.get_map_location()
+                    cur_dis = tile.get_map_location().distance_squared_to(cur_loc)
 
-    # Move and attack.
-    if is_searchmopper == False:
-        dir = directions[random.randint(0, len(directions) - 1)]
-        next_loc = get_location().add(dir)
-        if can_move(dir):
-            move(dir)
-        if can_attack(next_loc):
-            attack(next_loc)
-    elif current_target is not None:
+        
+        if current_target is None :
+            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+        
         search_dir = bug2(current_target)
-        if search_dir is not None:
-            next_loc = get_location().add(search_dir)
+        if can_move(search_dir):
             move(search_dir)
-
-    for tile in sense_nearby_map_infos(get_location(), 2):
-        if tile.get_paint().is_enemy() and can_attack(tile.get_map_location()):
-            attack(tile.get_map_location())
+        else:
+            log(f"Can't move in direction {search_dir}")
+            current_target = None
 
     if is_messenger:
         # Set a useful indicator at this mopper's location so we can see who is a messenger
-        set_indicator_dot(get_location(), 255, 0, 0)
+        set_indicator_dot(cur_loc, 255, 0, 0)
 
         update_friendly_towers()
         check_nearby_ruins()
@@ -1049,8 +1192,45 @@ def run_splasher():
     global tracing_turns
     global move_count
     global is_attackingsplasher
+    global attacking_turns
+    global non_attacking_turns
+    global is_flickering_tower
+    global flicker_tower_loc
 
     cur_loc = get_location()
+
+    if is_flickering_tower:
+        set_indicator_dot(cur_loc, 0,255,0)
+
+    input_messages()
+
+    if is_flickering_tower:
+        cur_dist = cur_loc.distance_squared_to(flicker_tower_loc)
+        if cur_dist > 2:
+            move_dir = bug2(flicker_tower_loc)
+            if move_dir is not None and can_move(move_dir):
+                move(move_dir)
+            return
+        if can_complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc):
+            complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc)
+            is_flickering_tower = False
+            flicker_tower_loc = None
+        elif sense_robot_at_location(flicker_tower_loc) is not None:
+            is_flickering_tower = False
+            flicker_tower_loc = None
+        else:
+            return
+
+    # if is_attackingsplasher:
+    #     if attacking_turns >= 40:
+    #         is_attackingsplasher = False
+    #         attacking_turns = 0
+    #     else:
+    #         attacking_turns += 1
+    # else:
+    #     if non_attacking_turns >= 40 and get_id() % 2 == 0:
+    #         is_attackingsplasher = True
+    #         non_attacking_turns = 0
 
     upgrade_nearby_paint_towers()
 
@@ -1098,7 +1278,7 @@ def run_splasher():
         move_count += 1
         if current_target is not None:
             search_dir = bug2(current_target)
-            if search_dir is not None:
+            if search_dir is not None and can_move(search_dir):
                 move(search_dir)
     max_splasher_profit = 0
     cur_loc = get_location()
@@ -1135,8 +1315,11 @@ def update_friendly_towers():
 
         # Add to our known towers array
         known_towers.append(ally_loc)
-        if ally.get_type() == UnitType.LEVEL_ONE_MONEY_TOWER:
+        tower_type = ally.get_type()
+        if tower_type == UnitType.LEVEL_ONE_MONEY_TOWER or tower_type == UnitType.LEVEL_TWO_MONEY_TOWER:
             known_money_towers.append(ally_loc)
+        elif tower_type == UnitType.LEVEL_ONE_PAINT_TOWER or tower_type == UnitType.LEVEL_TWO_PAINT_TOWER or tower_type == UnitType.LEVEL_THREE_PAINT_TOWER:
+            known_paint_towers.append(ally_loc)
         set_indicator_string(f"Found tower {ally.get_id()}")
 
 
@@ -1162,23 +1345,6 @@ def check_nearby_ruins():
 
         # Return early
         return
-
-#Bug 0
-def bug0(target):
-    # get direction from current location to target
-    dir = get_location().direction_to(target)
-    nextLoc = get_location().add(dir)
-
-    # try to move in target direction
-    if(can_move(dir)):
-        move(dir)
-
-    # keep turning left until we can move
-    for i in range(8):
-        dir = dir.rotate_left()
-        if can_move(dir):
-            move(dir)
-            break
 
 #Bug 1
 def bug1(target):

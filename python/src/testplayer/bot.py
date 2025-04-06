@@ -237,7 +237,7 @@ def turn():
                 is_attackingsoldier = True
             else:   
                 is_attackingsoldier = True
-        if round_num <= 100:
+        if round_num <= 50:
             is_SRP_builder = False
         else:
             if get_id() % 2 == 0:
@@ -350,7 +350,7 @@ def run_tower():
 
     cur_type = get_type()
 
-    if (cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER) and check_pattern() <= 25 and len(sense_nearby_robots(team=get_team().opponent())) == 0 and get_money() > 2000 and turn_count >= 20:
+    if (cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER) and check_pattern() <= 25 and len(sense_nearby_robots(team=get_team().opponent())) == 0 and get_money() > 2000 and turn_count >= 10:
         closest_ally = has_nearby_robots()
         # disintegrate()
         if closest_ally is not None:
@@ -665,7 +665,7 @@ def run_paint_pattern():
         disintegrate()
 
     dir = get_location().direction_to(painting_ruin_loc)
-    if cur_dist == 4:
+    if cur_dist == 2:
         left_dir = dir.rotate_left()
         right_dir = dir.rotate_right()
         if can_move(left_dir):
@@ -775,7 +775,7 @@ def input_messages():
     if len(messages) == 0:
         return
     for message in messages:
-        if message.get_round() < cur_round - 2:
+        if message.get_round() < cur_round - 1:
             continue
         msg_bytes = message.get_bytes()
         if msg_bytes < 1:
@@ -904,7 +904,7 @@ def run_soldier():
     if cur_ruin is not None:
         if cur_dist == 1 and get_paint() < 5:
             disintegrate()
-        if cur_dist > 4: 
+        if cur_dist > 2: 
             move_dir = bug2(cur_ruin.get_map_location())
             if move_dir is not None and can_move(move_dir):
                 move(move_dir)
@@ -1060,6 +1060,9 @@ def run_mopper():
 
     cur_loc = get_location()
 
+    if is_flickering_tower:
+        set_indicator_dot(cur_loc, 0,255,0)
+
     update_friendly_towers()
 
     input_messages()
@@ -1196,6 +1199,9 @@ def run_splasher():
 
     cur_loc = get_location()
 
+    if is_flickering_tower:
+        set_indicator_dot(cur_loc, 0,255,0)
+
     input_messages()
 
     if is_flickering_tower:
@@ -1209,18 +1215,22 @@ def run_splasher():
             complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc)
             is_flickering_tower = False
             flicker_tower_loc = None
+        elif sense_robot_at_location(flicker_tower_loc) is not None:
+            is_flickering_tower = False
+            flicker_tower_loc = None
+        else:
             return
 
-    if is_attackingsplasher:
-        if attacking_turns >= 40:
-            is_attackingsplasher = False
-            attacking_turns = 0
-        else:
-            attacking_turns += 1
-    else:
-        if non_attacking_turns >= 40 and get_id() % 2 == 0:
-            is_attackingsplasher = True
-            non_attacking_turns = 0
+    # if is_attackingsplasher:
+    #     if attacking_turns >= 40:
+    #         is_attackingsplasher = False
+    #         attacking_turns = 0
+    #     else:
+    #         attacking_turns += 1
+    # else:
+    #     if non_attacking_turns >= 40 and get_id() % 2 == 0:
+    #         is_attackingsplasher = True
+    #         non_attacking_turns = 0
 
     upgrade_nearby_paint_towers()
 

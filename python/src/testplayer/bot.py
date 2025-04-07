@@ -108,6 +108,7 @@ is_removing_enemy_paint = False
 is_searchsplasher = True
 is_attackingsplasher = False
 is_wanderingsplasher = False
+is_attacking = False
 wander_turns = 0
 
 current_target = MapLocation(100000, 100000)
@@ -1185,7 +1186,7 @@ def run_soldier():
                 cur_dist = check_dist
                 cur_ruin = tile
         tile_robot = sense_robot_at_location(tile_loc)
-        if tile_robot is not None and tile_robot.get_type().is_tower_type() and not tile_robot.get_team() == get_team():
+        if tile_robot is not None and tile_robot.get_type().is_tower_type() and tile_robot.get_team() == get_team().opponent():
             cur_enemy_tower = tile_loc
 
     if cur_ruin is not None:
@@ -1399,19 +1400,19 @@ def run_mopper():
             count_south += 1
 
     ma_count = max(count_east, max(count_north, max(count_south, count_west)))
-
-    if count_west == ma_count :
-        if can_mop_swing(Direction.WEST) :
-            mop_swing(Direction.WEST)
-    elif count_north == ma_count :
-        if can_mop_swing(Direction.NORTH) :
-            mop_swing(Direction.NORTH)
-    elif count_south == ma_count :
-        if can_mop_swing(Direction.SOUTH) :
-            mop_swing(Direction.SOUTH)
-    elif count_east == ma_count :
-        if can_mop_swing(Direction.EAST) :
-            mop_swing(Direction.EAST)
+    if ma_count >= 1:
+        if count_west == ma_count:
+            if can_mop_swing(Direction.WEST) :
+                mop_swing(Direction.WEST)
+        elif count_north == ma_count :
+            if can_mop_swing(Direction.NORTH) :
+                mop_swing(Direction.NORTH)
+        elif count_south == ma_count :
+            if can_mop_swing(Direction.SOUTH) :
+                mop_swing(Direction.SOUTH)
+        elif count_east == ma_count :
+            if can_mop_swing(Direction.EAST) :
+                mop_swing(Direction.EAST)
 
     is_move = False
     # skibidi movement
@@ -1460,7 +1461,7 @@ def splasher_profit(cur_loc):
     opponent_paint_near_ruin = 0
     not_painted = 0
     enemy_tower = 0
-    for tile in sense_nearby_map_infos(cur_loc, 4):
+    for tile in sense_nearby_map_infos(cur_loc,radius_squared = 2):
         if tile is None:
             continue  # Skip invalid tiles
         robot_tile = sense_robot_at_location(tile.get_map_location())
@@ -1480,7 +1481,7 @@ def splasher_profit(cur_loc):
                 opponent_paint += 1
         else:
             not_painted += 1
-    return enemy_tower * 4 + opponent_paint * 2 + not_painted - team_paint + opponent_paint * 3
+    return enemy_tower * 4 + opponent_paint * 2 + not_painted - team_paint + opponent_paint_near_ruin
 
 def run_splasher():
     # Global variables
@@ -1496,6 +1497,7 @@ def run_splasher():
     global symmetry
     global is_wanderingsplasher
     global wander_turns
+    global is_attacking
 
     cur_loc = get_location()
 
@@ -1538,9 +1540,38 @@ def run_splasher():
         refill_paint()
         return
 
-    update_friendly_towers()
+    min_dist = 9999
+    cur_enemy_tower = None
+    nearby_enemies = sense_nearby_robots(team=get_team().opponent())
+
+    for enemy in nearby_enemies:
+        if enemy.get_type().is_tower_type():
+            dist = cur_loc.distance_squared_to(enemy.get_location())
+            if dist < min_dist:
+                min_dist = dist
+                cur_enemy_tower = enemy
+    if cur_enemy_tower is not None:
+        enemy_loc = cur_enemy_tower.get_location()
+        if cur_loc.distance_squared_to(enemy_loc) != 10:
+            for dir in directions:
+                next_loc = get_location().add(dir)
+                if can_move(dir) and next_loc.distance_squared_to(enemy_loc) == 10:
+                    move(dir)
+                    break
+        if get_location().distance_squared_to(enemy_loc) == 10:
+            dir = get_location().direction_to(enemy_loc)
+            close_attack_loc = get_location().add(dir).add(dir)
+            if can_attack(close_attack_loc):
+                attack(close_attack_loc)
+            is_attacking = True
+        else:
+            is_attacking = False
+    else:
+        is_attacking = False
 
     mark_patterns()
+
+    update_friendly_towers()
 
     if turn_count == 1 :
         move_count = 0
@@ -1574,7 +1605,7 @@ def run_splasher():
         if is_attackingsplasher and cur_loc.distance_squared_to(current_target) <= 2:
             current_target = None
         move_count += 1
-        if current_target is not None:
+        if current_target is not None and is_attacking == False:
             search_dir = bug2(current_target)
             if search_dir is not None and can_move(search_dir):
                 move(search_dir)

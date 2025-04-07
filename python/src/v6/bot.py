@@ -77,6 +77,7 @@ is_searchsoldier = True
 is_attackingsoldier = False
 searchsoldier_type = [False] * 8
 targets = []
+visited_targets = [False] * 9
 is_marking_SRP = False
 has_marked_SRP = False
 move_count = 0
@@ -137,6 +138,32 @@ def min(a, b):
     if a < b:
         return a
     return b
+
+def get_new_target():
+    global current_target
+    global visited_targets
+    not_visited_locs = []
+    max_dist = 0
+    max_index = -1
+    for i in range(9):
+        if visited_targets[i] == True:
+            continue
+        dist = get_location().distance_squared_to(targets[i])
+        if dist >= 100:
+            not_visited_locs.append(i)
+        if dist > max_dist:
+            max_dist = dist
+            max_index = i
+    if len(not_visited_locs) > 0:
+        if get_round_num() < 4 and visited_targets[4] == False:
+            current_target = targets[4]
+        else:
+            current_target = targets[not_visited_locs[get_id() % len(not_visited_locs)]]
+    elif max_index != -1:
+        current_target = targets[max_index]
+    else:
+        for i in range(9):
+            visited_targets[i] = False
 
 def turn():
     """
@@ -216,14 +243,14 @@ def turn():
         mid_game_start = 81
         end_game_start = 156
         money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
-    elif height * width <= 2000:
+    elif height * width <= 1500:
         early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
-        mid_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER]
-        end_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER]
+        mid_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER]
+        end_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER]
         mid_game_start = 106
         end_game_start = 256
-        if cur_round < mid_game_start:
-            money_tower_spawn = [UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER]
+        if cur_round < 80:
+            money_tower_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER]
         elif cur_round < end_game_start:
             money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
         else:
@@ -234,7 +261,7 @@ def turn():
         end_game_spawn = [UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
         mid_game_start = 151
         end_game_start = 271 
-        if cur_round < 75:
+        if cur_round <= 115:
             money_tower_spawn = [UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER]
         elif cur_round < end_game_start:
             money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
@@ -251,7 +278,7 @@ def turn():
             else:
                 is_SRP_builder = False
     if current_target is not None and current_target == MapLocation(100000, 100000):
-        current_target = targets[get_id() % len(targets)]
+        get_new_target()
         tracing_turns = 0
 
     if get_type() == UnitType.SOLDIER:
@@ -1292,7 +1319,7 @@ def run_soldier():
     #             attack(tile.get_map_location())
     
     if is_attackingsoldier == False and current_target is None:
-        current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+        get_new_target()
 
     # Movement
     if is_searchsoldier == False:
@@ -1303,7 +1330,11 @@ def run_soldier():
     elif current_target is not None:
         if is_attackingsoldier == False and (cur_loc.distance_squared_to(current_target) <= 5 or move_count >= 100):
             log("Reached target, now changing to new target")
-            current_target = MapLocation(random.randint(0, width-1), random.randint(0, height-1))
+            for i in range(9):
+                if targets[i] == current_target:
+                    visited_targets[i] = True
+                    break
+            get_new_target()
             tracing_turns = 0
             move_count = 0
         if is_attackingsoldier and cur_loc.distance_squared_to(current_target) <= 2:

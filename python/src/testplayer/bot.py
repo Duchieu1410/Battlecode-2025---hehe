@@ -60,6 +60,18 @@ paint_capacity = 0
 attacking_turns = 0
 non_attacking_turns = 0
 
+# Symmetry variables
+symmetry = -1
+symmetry_locs_visited = [False] * 3
+symmetry_broken = [False] * 3
+mid_x1 = None
+mid_x2 = None
+mid_y1 = None
+mid_y2 = None
+vert_checked_locs = []
+horz_checked_locs = []
+diag_checked_locs = []
+
 # Soldier Variables
 is_searchsoldier = True
 is_attackingsoldier = False
@@ -95,6 +107,8 @@ is_removing_enemy_paint = False
 # Splasher Variables
 is_searchsplasher = True
 is_attackingsplasher = False
+is_wanderingsplasher = False
+wander_turns = 0
 
 current_target = MapLocation(100000, 100000)
 
@@ -153,6 +167,10 @@ def turn():
     global current_tower_index
     global money_tower_spawn
     global SRP_pattern
+    global mid_x1
+    global mid_x2
+    global mid_y1
+    global mid_y2
     turn_count += 1
 
     if get_round_num() == 1:
@@ -163,6 +181,18 @@ def turn():
         money_tower_pattern = get_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER)
         defense_tower_pattern = get_tower_pattern(UnitType.LEVEL_ONE_DEFENSE_TOWER)
         SRP_pattern = get_resource_pattern()
+        if width % 2 == 1:
+            mid_x1 = width / 2
+            mid_x2 = width / 2
+        else:
+            mid_x1 = width / 2 - 1
+            mid_x2 = width / 2
+        if height % 2 == 1:
+            mid_y1 = height / 2
+            mid_y2 = height / 2
+        else:
+            mid_y1 = height / 2 - 1
+            mid_y2 = height / 2
 
     # block_width = int(math.sqrt(width)) 
     # block_height = int(math.sqrt(height))
@@ -188,34 +218,29 @@ def turn():
     cur_round = get_round_num()
 
     # Tower spawn threshold
-    if height * width <= 900:
+    if height * width <= 750:
         early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER, UnitType.SPLASHER]
-        mid_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
+        mid_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER]
         end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
         mid_game_start = 81
         end_game_start = 156
-        if cur_round < mid_game_start:
-            money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
-        elif cur_round < end_game_start:
-            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
-        else:
-            money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
+        money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
     elif height * width <= 2000:
         early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
-        mid_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER]
-        end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER]
+        mid_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER]
+        end_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER]
         mid_game_start = 106
         end_game_start = 256
         if cur_round < mid_game_start:
-            money_tower_spawn = [UnitType.SOLDIER, UnitType.SPLASHER]
+            money_tower_spawn = [UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER]
         elif cur_round < end_game_start:
             money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
         else:
             money_tower_spawn = [UnitType.SPLASHER, UnitType.SOLDIER]
     else:
-        early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
-        mid_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER]
-        end_game_spawn = [UnitType.SPLASHER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER]
+        early_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SPLASHER, UnitType.SOLDIER]
+        mid_game_spawn = [UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
+        end_game_spawn = [UnitType.MOPPER, UnitType.SOLDIER, UnitType.MOPPER, UnitType.SOLDIER, UnitType.SOLDIER, UnitType.SPLASHER, UnitType.MOPPER]
         mid_game_start = 151
         end_game_start = 271 
         if cur_round < 75:
@@ -227,16 +252,6 @@ def turn():
 
     # Sets a part of soldiers as attackers
     if get_type() == UnitType.SOLDIER:
-        if round_num <= 200: 
-            if get_id() % 4 == 0:
-                is_attackingsoldier = True
-            else:
-                is_attackingsoldier = False
-        else:
-            if get_id() % 4 == 0:
-                is_attackingsoldier = True
-            else:   
-                is_attackingsoldier = True
         if round_num <= 50:
             is_SRP_builder = False
         else:
@@ -350,7 +365,7 @@ def run_tower():
 
     cur_type = get_type()
 
-    if (cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER) and check_pattern() <= 25 and len(sense_nearby_robots(team=get_team().opponent())) == 0 and get_money() > 2000 and turn_count >= 10:
+    if (cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER) and check_pattern() <= 20 and len(sense_nearby_robots(team=get_team().opponent())) == 0 and get_money() > 2000 and turn_count >= 10:
         closest_ally = has_nearby_robots()
         # disintegrate()
         if closest_ally is not None:
@@ -369,7 +384,7 @@ def run_tower():
         build_robot(UnitType.SOLDIER, next_loc)
     if cur_round == 2 and next_loc is not None:
         if cur_type == UnitType.LEVEL_ONE_MONEY_TOWER or cur_type == UnitType.LEVEL_TWO_MONEY_TOWER:
-            if height * width >= 1000:
+            if height * width >= 900:
                 build_robot(UnitType.SOLDIER, next_loc)
             else:
                 build_robot(UnitType.SPLASHER, next_loc)
@@ -472,6 +487,253 @@ def run_tower():
     # t_type = get_type()
     # if len(nearbyRobots) > 0 and has_spawned_mopper == False and (t_type == UnitType.LEVEL_ONE_PAINT_TOWER or t_type == UnitType.LEVEL_TWO_PAINT_TOWER or t_type == UnitType.LEVEL_THREE_PAINT_TOWER):
     #     if can_build_robot( )
+
+def check_similar(loc1, loc2, symmetry_type):
+    global symmetry_locs_visited
+    global symmetry_broken
+    global symmetry
+    if loc1 == loc2:
+        return False
+    if can_sense_location(loc1) == False or can_sense_location(loc2) == False:
+        return False
+    info1 = sense_map_info(loc1)
+    info2 = sense_map_info(loc2)
+    if info1.has_ruin() != info2.has_ruin() or info1.is_wall() != info2.is_wall():
+        symmetry_locs_visited[symmetry_type] = True
+        symmetry_broken[symmetry_type] = True
+        log(f"Symmetry is not {symmetry_type}")
+        if symmetry == -1:
+            unbroken_count = 0
+            for i in range(3):
+                if symmetry_broken[i] == False:
+                    unbroken_count += 1
+                    symmetry = i
+            if unbroken_count != 1:
+                symmetry = -1
+            else:
+                log(f"Symmetry is {symmetry}")
+        return True
+    return False
+
+
+def check_symmetry():
+    global symmetry_locs_visited
+    global symmetry
+    global horz_checked_locs
+    global vert_checked_locs
+    global diag_checked_locs
+    x = get_location().x 
+    y = get_location().y
+    if symmetry_locs_visited[1] == False:
+        vert = True
+        if x <= mid_x1:
+            for i in range (4, -1, -1):
+                if x+i >= mid_x2:
+                    for j in range(5):
+                        if j == 0:
+                            loc1 = MapLocation(x+i, y)
+                            loc2 = MapLocation(width - x - i - 1, y)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if loc1 in vert_checked_locs:
+                                continue
+                            vert_checked_locs.append(loc1)
+                            if check_similar(loc1, loc2, 1):
+                                vert = False
+                                break
+                        else:
+                            loc1 = MapLocation(x+i, y + j)
+                            loc2 = MapLocation(width - x - i - 1, y + j)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if not loc1 in vert_checked_locs:
+                                vert_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 1):
+                                    vert = False
+                                    break
+                                loc1 = MapLocation(x+i, y-j)
+                                loc2 = MapLocation(width - x - i - 1, y-j)
+                                if loc1 in vert_checked_locs:
+                                    continue
+                                vert_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 1):
+                                    vert = False
+                        if vert == False:
+                            break
+                if vert == False:
+                    break
+        else:
+            for i in range (4, -1, -1):
+                if x-i >= mid_x1:
+                    for j in range(5):
+                        if j == 0:
+                            loc1 = MapLocation(x-i, y)
+                            loc2 = MapLocation(width - x + i - 1, y)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if loc1 in vert_checked_locs:
+                                continue
+                            vert_checked_locs.append(loc1)
+                            if check_similar(loc1, loc2, 1):
+                                vert = False
+                                break
+                        else:
+                            loc1 = MapLocation(x-i, y + j)
+                            loc2 = MapLocation(width - x + i - 1, y + j)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if not loc1 in vert_checked_locs:
+                                vert_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 1):
+                                    vert = False
+                                    break
+                                loc1 = MapLocation(x-i, y-j)
+                                loc2 = MapLocation(width - x + i - 1, y-j)
+                                if loc1 in vert_checked_locs:
+                                    continue
+                                vert_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 1):
+                                    vert = False
+                        if vert == False:
+                            break
+                if vert == False:
+                    break
+    if symmetry_locs_visited[2] == False:
+        horz = True
+        if y <= mid_y1:
+            for i in range (4, -1, -1):
+                if y+i >= mid_y2:
+                    for j in range(5):
+                        if j == 0:
+                            loc1 = MapLocation(x, y+i)
+                            loc2 = MapLocation(x, height - y - i - 1)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if loc1 in horz_checked_locs:
+                                continue
+                            horz_checked_locs.append(loc1)
+                            if check_similar(loc1, loc2, 2):
+                                horz = False
+                                break
+                        else:
+                            loc1 = MapLocation(x+j, y + i)
+                            loc2 = MapLocation(x+j, height - y - i - 1)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if not loc1 in horz_checked_locs:
+                                horz_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 2):
+                                    horz = False
+                                    break
+                                loc1 = MapLocation(x-j, y+i)
+                                loc2 = MapLocation(x-j, height - y - i - 1)
+                                if loc1 in horz_checked_locs:
+                                    continue
+                                horz_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 2):
+                                    horz = False
+                        if horz == False:
+                            break
+                if horz == False:
+                    break
+        else:
+            for i in range (4, -1, -1):
+                if y-i <= mid_y1:
+                    for j in range(5):
+                        if j == 0:
+                            loc1 = MapLocation(x, y-i)
+                            loc2 = MapLocation(x, height - y + i - 1)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if loc1 in horz_checked_locs:
+                                continue
+                            horz_checked_locs.append(loc1)
+                            if check_similar(loc1, loc2, 2):
+                                horz = False
+                                break
+                        else:
+                            loc1 = MapLocation(x+j, y-i)
+                            loc2 = MapLocation(x+j, height - y + i - 1)
+                            if can_sense_location(loc1) == False:
+                                break
+                            if not loc1 in horz_checked_locs:
+                                horz_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 2):
+                                    horz = False
+                                    break
+                                loc1 = MapLocation(x-j, y-i)
+                                loc2 = MapLocation(x-j, height - y + i - 1)
+                                if loc1 in horz_checked_locs:
+                                    continue
+                                horz_checked_locs.append(loc1)
+                                if check_similar(loc1, loc2, 2):
+                                    horz = False
+                        if horz == False:
+                            break
+                if horz == False:
+                    break
+    if symmetry_locs_visited[0] == False:
+        diag = True
+        if x <= mid_x1 and y <= mid_y1:
+            for i in range(4,-1,-1):
+                for j in range(5):
+                    loc1 = MapLocation(x+i, y+j)
+                    loc2 = MapLocation(width - x - i - 1, height - y - j - 1)
+                    if can_sense_location(loc1) == False:
+                        break
+                    if loc1 in diag_checked_locs:
+                        continue
+                    diag_checked_locs.append(loc1)
+                    if check_similar(loc1, loc2, 0):
+                        diag = False
+                        break
+                if diag == False:
+                    break
+        elif x <= mid_x1 and y >= mid_y2:
+            for i in range(4,-1,-1):
+                for j in range(5):
+                    loc1 = MapLocation(x+i, y-j)
+                    loc2 = MapLocation(width - x - i - 1, height - y + j - 1)
+                    if can_sense_location(loc1) == False:
+                        break
+                    if loc1 in diag_checked_locs:
+                        continue
+                    diag_checked_locs.append(loc1)
+                    if check_similar(loc1, loc2, 0):
+                        diag = False
+                        break
+                if diag == False:
+                    break
+        elif x >= mid_x2 and y <= mid_y1:
+            for i in range(4,-1,-1):
+                for j in range(5):
+                    loc1 = MapLocation(x-i, y+j)
+                    loc2 = MapLocation(width - x + i - 1, height - y - j - 1)
+                    if can_sense_location(loc1) == False:
+                        break
+                    if loc1 in diag_checked_locs:
+                        continue
+                    diag_checked_locs.append(loc1)
+                    if check_similar(loc1, loc2, 0):
+                        diag = False
+                        break
+                if diag == False:
+                    break
+        else:
+            for i in range(4,-1,-1):
+                for j in range(5):
+                    loc1 = MapLocation(x-i, y-j)
+                    loc2 = MapLocation(width - x + i - 1, height - y + j - 1)
+                    if can_sense_location(loc1) == False:
+                        break
+                    if loc1 in diag_checked_locs:
+                        continue
+                    diag_checked_locs.append(loc1)
+                    if check_similar(loc1, loc2, 0):
+                        diag = False
+                        break
+                if diag == False:
+                    break
 
 def upgrade_nearby_paint_towers():
     # Search for all nearby robots
@@ -626,10 +888,10 @@ def SRP_mark():
 def has_nearby_enemy_paint(ruin_loc):
     cur_team = get_team()
     for tile in sense_nearby_map_infos(ruin_loc, 8):
-        if tile.get_paint().is_enemy():
+        if tile.get_paint() != PaintType.EMPTY and tile.get_paint().is_enemy():
             has_mopper = False
-            for t in sense_nearby_robots(tile.get_map_location()):
-                if t.get_type() == UnitType.MOPPER and t.get_team() == cur_team:
+            for t in sense_nearby_robots(tile.get_map_location(), team=get_team()):
+                if t.get_type() == UnitType.MOPPER:
                     has_mopper = True
                     break
             if has_mopper == False:
@@ -658,6 +920,11 @@ def run_paint_pattern():
     global tower_type
     global is_painting_pattern
     global is_flickering_tower
+
+    if has_nearby_enemy_paint(painting_ruin_loc) == False:
+        is_painting_pattern = False
+        is_flickering_tower = False
+        return
 
     cur_dist = get_location().distance_squared_to(painting_ruin_loc)
 
@@ -854,6 +1121,26 @@ def run_soldier():
             painting_turns = 0
             painting_ruin_loc = flicker_tower_loc
 
+    if symmetry == -1:
+        is_attackingsoldier = False
+    else:
+        if height * width <= 800:
+            if get_id() % 2 == 0:
+                is_attackingsoldier = True
+            else:
+                is_attackingsoldier = False
+        else:
+            if get_round_num() <= 150:
+                if get_id() % 4 == 0:
+                    is_attackingsoldier = True
+                else:
+                    is_attackingsoldier = False
+            else:
+                if get_id() % 4 == 0:
+                    is_attackingsoldier = False
+                else:
+                    is_attackingsoldier = True
+
     if get_paint() <= 20:
         is_refilling = True
     if is_refilling == True: 
@@ -969,13 +1256,21 @@ def run_soldier():
     # Attacks enemy tower 
     if cur_enemy_tower is not None:
         enemy_tower_dist = cur_loc.distance_squared_to(cur_enemy_tower)
-        dir = bug2(cur_enemy_tower)
-        if enemy_tower_dist > 4:
-            if dir is not None and can_move(dir):
-                move(dir)
-            if can_attack(cur_enemy_tower):
-                log("Gotta kill em all")
-                attack(cur_enemy_tower)
+        has_moved = False
+        if enemy_tower_dist > 8:
+            for d in directions:
+                new_loc = cur_loc.add(d)
+                if new_loc.is_within_distance_squared(cur_enemy_tower, 8):
+                    if can_move(d):
+                        move(d)
+                        has_moved = True
+                        if can_attack(cur_enemy_tower):
+                            attack(cur_enemy_tower)
+                        break
+            if has_moved == False:
+                dir = bug2(cur_enemy_tower)
+                if can_move(dir):
+                    move(dir)
         else:
             if can_attack(cur_enemy_tower):
                 log("Gotta kill em all")
@@ -988,17 +1283,17 @@ def run_soldier():
             elif can_move(away.rotate_right()):
                 move(away.rotate_right())
 
-    if is_attackingsoldier and (turn_count == 1 or current_target is None):
-        rand = random.randint(1,3)
-        if rand == 1:
-            current_target = MapLocation(cur_loc.x, height - cur_loc.y)
-        elif rand == 2:
-            current_target = MapLocation(width-cur_loc.x,height-cur_loc.y)
-        else:
-            current_target = MapLocation(width - cur_loc.x, cur_loc.y)
-        move_count = 0
-
     mark_patterns()
+
+    if is_attackingsoldier and (turn_count == 1 or current_target is None):
+        tower_loc = known_towers[random.randint(0, len(known_towers)-1)]
+        if symmetry == 1:
+            current_target = MapLocation(tower_loc.x, height - tower_loc.y)
+        elif symmetry == 2:
+            current_target = MapLocation(width-tower_loc.x,height-tower_loc.y)
+        else:
+            current_target = MapLocation(width - tower_loc.x, tower_loc.y)
+        move_count = 0
 
     # for tile in nearby_tiles:
     #     if tile.get_paint() == PaintType.EMPTY:
@@ -1041,6 +1336,9 @@ def run_soldier():
                 t_loc = tile.get_map_location()
                 if tile.get_paint() == PaintType.EMPTY and can_attack(t_loc):
                     attack(t_loc)
+    if symmetry == -1:
+        check_symmetry()
+
 
 def max(a, b):
     if a < b:
@@ -1080,7 +1378,7 @@ def run_mopper():
             flicker_tower_loc = None 
 
     # TODO mop_swing op hehe
-    enemy_robots= sense_nearby_robots(cur_loc,2,team = get_team().opponent())
+    enemy_robots= sense_nearby_robots(cur_loc,radius_squared=2,team = get_team().opponent())
 
     count_west = 0
     count_north = 0
@@ -1091,30 +1389,29 @@ def run_mopper():
         loc = robot.get_location()  
         robot_x, robot_y = loc.x, loc.y
 
-        if robot_x > cur_loc.x:
+        if robot_x >= cur_loc.x:
             count_east += 1
-        if robot_x < cur_loc.x:
+        if robot_x <= cur_loc.x:
             count_west += 1
-        if robot_y > cur_loc.y:
+        if robot_y >= cur_loc.y:
             count_north += 1
-        if robot_y < cur_loc.y:
+        if robot_y <= cur_loc.y:
             count_south += 1
-
 
     ma_count = max(count_east, max(count_north, max(count_south, count_west)))
 
     if count_west == ma_count :
-        if can_mop_swing(directions.WEST) :
-            mop_swing(directions.WEST)
+        if can_mop_swing(Direction.WEST) :
+            mop_swing(Direction.WEST)
     elif count_north == ma_count :
-        if can_mop_swing(directions.NORTH) :
-            mop_swing(directions.NORTH)
+        if can_mop_swing(Direction.NORTH) :
+            mop_swing(Direction.NORTH)
     elif count_south == ma_count :
-        if can_mop_swing(directions.SOUTH) :
-            mop_swing(directions.SOUTH)
+        if can_mop_swing(Direction.SOUTH) :
+            mop_swing(Direction.SOUTH)
     elif count_east == ma_count :
-        if can_mop_swing(directions.EAST) :
-            mop_swing(directions.EAST)
+        if can_mop_swing(Direction.EAST) :
+            mop_swing(Direction.EAST)
 
     is_move = False
     # skibidi movement
@@ -1196,11 +1493,16 @@ def run_splasher():
     global non_attacking_turns
     global is_flickering_tower
     global flicker_tower_loc
+    global symmetry
+    global is_wanderingsplasher
+    global wander_turns
 
     cur_loc = get_location()
 
     if is_flickering_tower:
         set_indicator_dot(cur_loc, 0,255,0)
+    if is_attackingsplasher:
+        set_indicator_dot(cur_loc, 255,0,0)
 
     input_messages()
 
@@ -1221,16 +1523,11 @@ def run_splasher():
         else:
             return
 
-    # if is_attackingsplasher:
-    #     if attacking_turns >= 40:
-    #         is_attackingsplasher = False
-    #         attacking_turns = 0
-    #     else:
-    #         attacking_turns += 1
-    # else:
-    #     if non_attacking_turns >= 40 and get_id() % 2 == 0:
-    #         is_attackingsplasher = True
-    #         non_attacking_turns = 0
+    if symmetry == -1:
+        is_attackingsplasher = False
+    else:
+        if get_id() % 3 != 0:
+            is_attackingsplasher = True
 
     upgrade_nearby_paint_towers()
 
@@ -1247,14 +1544,15 @@ def run_splasher():
 
     if turn_count == 1 :
         move_count = 0
+
     if is_attackingsplasher and (turn_count == 1 or current_target is None):
-        rand = random.randint(1,3)
-        if rand == 1:
-            current_target = MapLocation(cur_loc.x, height - cur_loc.y)
-        elif rand == 2:
-            current_target = MapLocation(width-cur_loc.x,height-cur_loc.y)
+        tower_loc = known_towers[random.randint(0, len(known_towers)-1)]
+        if symmetry == 1:
+            current_target = MapLocation(tower_loc.x, height - tower_loc.y)
+        elif symmetry == 2:
+            current_target = MapLocation(width-tower_loc.x,height-tower_loc.y)
         else:
-            current_target = MapLocation(width - cur_loc.x, cur_loc.y)
+            current_target = MapLocation(width - tower_loc.x, tower_loc.y)
         move_count = 0
 
     if is_attackingsplasher == False and current_target is None:
@@ -1292,6 +1590,8 @@ def run_splasher():
             attack_position = tile.get_map_location()
     if max_splasher_profit >= 6:
         attack(attack_position)
+    if symmetry == -1:
+        check_symmetry()
 
 def update_friendly_towers():
     global should_save

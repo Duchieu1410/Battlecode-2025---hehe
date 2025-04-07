@@ -775,7 +775,7 @@ def input_messages():
     if len(messages) == 0:
         return
     for message in messages:
-        if message.get_round() < cur_round - 1:
+        if message.get_round() < cur_round - 2:
             continue
         msg_bytes = message.get_bytes()
         if msg_bytes < 1:
@@ -1060,9 +1060,6 @@ def run_mopper():
 
     cur_loc = get_location()
 
-    if is_flickering_tower:
-        set_indicator_dot(cur_loc, 0,255,0)
-
     update_friendly_towers()
 
     input_messages()
@@ -1199,9 +1196,6 @@ def run_splasher():
 
     cur_loc = get_location()
 
-    if is_flickering_tower:
-        set_indicator_dot(cur_loc, 0,255,0)
-
     input_messages()
 
     if is_flickering_tower:
@@ -1215,10 +1209,6 @@ def run_splasher():
             complete_tower_pattern(UnitType.LEVEL_ONE_MONEY_TOWER, flicker_tower_loc)
             is_flickering_tower = False
             flicker_tower_loc = None
-        elif sense_robot_at_location(flicker_tower_loc) is not None:
-            is_flickering_tower = False
-            flicker_tower_loc = None
-        else:
             return
 
     # if is_attackingsplasher:
